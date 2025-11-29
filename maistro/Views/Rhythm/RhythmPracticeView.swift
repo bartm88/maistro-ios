@@ -25,18 +25,10 @@ struct RhythmPracticeView: View {
         ScrollView {
             VStack(spacing: 16) {
                 // Two-column layout: Evaluation chart | Controls + Metronome
+                
                 HStack(alignment: .top, spacing: 16) {
-                    // Column 1: Evaluation chart
-                    EvaluationChartView(
-                        durationScore: durationScore,
-                        rhythmScore: rhythmScore,
-                        pitchScore: pitchScore,
-                        width: 200,
-                        height: 290
-                    )
-
-                    // Column 2: Controls and Metronome
-                    VStack(spacing: 16) {
+                    VStack(spacing: 8) {
+                        
                         // Top row: 3 control buttons
                         HStack(spacing: 8) {
                             ThemedButton(
@@ -45,14 +37,14 @@ struct RhythmPracticeView: View {
                                 size: .small,
                                 action: clearAttempt
                             )
-
+                            
                             ThemedButton(
                                 systemName: "forward.fill",
                                 type: .neutral,
                                 size: .small,
                                 action: newPassage
                             )
-
+                            
                             ThemedButton(
                                 systemName: "gearshape",
                                 type: .neutral,
@@ -60,6 +52,41 @@ struct RhythmPracticeView: View {
                                 action: { showSettings = true }
                             )
                         }
+                        // Column 1: Evaluation chart
+                        EvaluationChartView(
+                            durationScore: durationScore,
+                            rhythmScore: rhythmScore,
+                            pitchScore: pitchScore,
+                            width: 230,
+                            height: 153
+                        )
+                    }
+
+                    // Column 2: Controls and Metronome
+                    VStack(spacing: 16) {
+//                        // Top row: 3 control buttons
+//                        HStack(spacing: 8) {
+//                            ThemedButton(
+//                                systemName: "arrow.counterclockwise",
+//                                type: .neutral,
+//                                size: .small,
+//                                action: clearAttempt
+//                            )
+//
+//                            ThemedButton(
+//                                systemName: "forward.fill",
+//                                type: .neutral,
+//                                size: .small,
+//                                action: newPassage
+//                            )
+//
+//                            ThemedButton(
+//                                systemName: "gearshape",
+//                                type: .neutral,
+//                                size: .small,
+//                                action: { showSettings = true }
+//                            )
+//                        }
 
                         // Bottom row: Metronome
                         Metronome(

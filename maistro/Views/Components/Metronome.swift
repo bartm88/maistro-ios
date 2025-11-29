@@ -136,8 +136,8 @@ struct Metronome: View {
     init(
         initialTempo: Double = 120,
         minTempo: Double = 40,
-        maxTempo: Double = 220,
-        metronomeAngle: Double = 75,
+        maxTempo: Double = 260,
+        metronomeAngle: Double = 80,
         onTempoChange: ((Double) -> Void)? = nil
     ) {
         self.initialTempo = initialTempo
@@ -160,7 +160,7 @@ struct Metronome: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 4) {
             // Metronome visual
             ZStack {
                 // Arc background (pie slice)
@@ -239,7 +239,7 @@ struct Metronome: View {
                 }
             )
         }
-        .padding()
+        .padding(8)
         .background(themeManager.colors.neutral)
         .cornerRadius(16)
         .overlay(
