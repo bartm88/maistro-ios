@@ -183,3 +183,15 @@ extension ThemedButton {
         }
     }
 }
+
+#Preview {
+    VStack {
+        ThemedButton("Primary", type: .primary, action: {})
+        ThemedButton("Secondary", type: .secondary, action: {})
+        ThemedButton("Confirmation", type: .confirmation, action: {})
+        ThemedButton("Neutral", type: .neutral, action: {})
+        ThemedButton("Negative", type: .negative, action: {})
+    }
+    .padding()
+    .environmentObject(ThemeManager.shared)
+}

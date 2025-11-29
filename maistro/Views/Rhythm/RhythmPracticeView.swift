@@ -8,6 +8,7 @@ import SwiftUI
 struct RhythmPracticeView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var viewRouter: ViewRouter
+    @State private var showingThemeSheet = false
 
     @State private var tempo: Double = 120
     @State private var measureCount: Int = 2
@@ -21,113 +22,107 @@ struct RhythmPracticeView: View {
     @State private var pitchScore: Double = 0
 
     var body: some View {
-        ZStack {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Top controls row
+                HStack {
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        ThemedButton(
+                            systemName: "arrow.counterclockwise",
+                            type: .neutral,
+                            size: .small,
+                            action: clearAttempt
+                        )
+
+                        ThemedButton(
+                            systemName: "forward.fill",
+                            type: .neutral,
+                            size: .small,
+                            action: newPassage
+                        )
+
+                        ThemedButton(
+                            systemName: "gearshape",
+                            type: .neutral,
+                            size: .small,
+                            action: { showSettings = true }
+                        )
+                    }
+                }
+                .padding(.horizontal)
+
+                // Evaluation and Metronome row
+                HStack(alignment: .top, spacing: 16) {
+                    // Evaluation chart placeholder
+                    EvaluationChartView(
+                        durationScore: durationScore,
+                        rhythmScore: rhythmScore,
+                        pitchScore: pitchScore
+                    )
+                    .frame(width: 180, height: 180)
+
+                    Spacer()
+
+                    // Metronome
+                    Metronome(
+                        initialTempo: tempo,
+                        onTempoChange: { newTempo in
+                            tempo = newTempo
+                        }
+                    )
+                }
+                .padding(.horizontal)
+
+                // Sheet music displays
+                VStack(spacing: 16) {
+                    // Target passage
+                    SheetMusicPlaceholder(
+                        label: "Target",
+                        measureCount: measureCount,
+                        timeSignature: timeSignature
+                    )
+
+                    // Played passage
+                    SheetMusicPlaceholder(
+                        label: "Played",
+                        measureCount: measureCount,
+                        timeSignature: timeSignature,
+                        showEvaluation: true
+                    )
+                }
+                .padding(.horizontal)
+
+                // Tap button
+                TapButton(
+                    isTapping: $isTapping,
+                    onTapDown: sendTapDown,
+                    onTapUp: sendTapUp
+                )
+                .padding(.top, 20)
+            }
+            .padding(.vertical)
+        }
+        .safeAreaInset(edge: .top) {
+            AppHeaderView(
+                title: "Rhythm Practice",
+                showBackButton: true,
+                showSettingsButton: true,
+                onBack: {
+                    viewRouter.goBack()
+                },
+                onSettings: {
+                    showingThemeSheet = true
+                }
+            )
+        }
+        .background(
             themeManager.colors.neutral
                 .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Header
-                AppHeaderView(
-                    title: "Maistro",
-                    subtitle: "Rhythm Practice",
-                    showBackButton: true,
-                    showSettingsButton: true,
-                    onBack: {
-                        viewRouter.goBack()
-                    },
-                    onSettings: {
-                        showSettings = true
-                    }
-                )
-
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // Top controls row
-                        HStack {
-                            Text("Rhythm Practice")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(themeManager.colors.textNeutral)
-
-                            Spacer()
-
-                            HStack(spacing: 8) {
-                                ThemedButton(
-                                    systemName: "arrow.counterclockwise",
-                                    type: .neutral,
-                                    size: .small,
-                                    action: clearAttempt
-                                )
-
-                                ThemedButton(
-                                    systemName: "forward.fill",
-                                    type: .neutral,
-                                    size: .small,
-                                    action: newPassage
-                                )
-
-                                ThemedButton(
-                                    systemName: "gearshape",
-                                    type: .neutral,
-                                    size: .small,
-                                    action: { showSettings = true }
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        // Evaluation and Metronome row
-                        HStack(alignment: .top, spacing: 16) {
-                            // Evaluation chart placeholder
-                            EvaluationChartView(
-                                durationScore: durationScore,
-                                rhythmScore: rhythmScore,
-                                pitchScore: pitchScore
-                            )
-                            .frame(width: 180, height: 180)
-
-                            Spacer()
-
-                            // Metronome
-                            Metronome(
-                                initialTempo: tempo,
-                                onTempoChange: { newTempo in
-                                    tempo = newTempo
-                                }
-                            )
-                        }
-                        .padding(.horizontal)
-
-                        // Sheet music displays
-                        VStack(spacing: 16) {
-                            // Target passage
-                            SheetMusicPlaceholder(
-                                label: "Target",
-                                measureCount: measureCount,
-                                timeSignature: timeSignature
-                            )
-
-                            // Played passage
-                            SheetMusicPlaceholder(
-                                label: "Played",
-                                measureCount: measureCount,
-                                timeSignature: timeSignature,
-                                showEvaluation: true
-                            )
-                        }
-                        .padding(.horizontal)
-
-                        // Tap button
-                        TapButton(
-                            isTapping: $isTapping,
-                            onTapDown: sendTapDown,
-                            onTapUp: sendTapUp
-                        )
-                        .padding(.top, 20)
-                    }
-                    .padding(.vertical)
-                }
-            }
+        )
+        .sheet(isPresented: $showingThemeSheet) {
+            ThemePickerSheet()
         }
         .sheet(isPresented: $showSettings) {
             RhythmSettingsSheet(

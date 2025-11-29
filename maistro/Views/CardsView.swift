@@ -16,40 +16,36 @@ struct CardsView: View {
     ]
 
     var body: some View {
-        ZStack {
-            // Background
-            themeManager.colors.neutral
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Header
-                AppHeaderView(
-                    title: "Maistro",
-                    showBackButton: false,
-                    showSettingsButton: true,
-                    onSettings: {
-                        showingThemeSheet = true
-                    }
-                )
-
-                // Cards grid
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 16) {
-                        ForEach(appCards) { card in
-                            FeatureCard(
-                                title: card.title,
-                                description: card.description,
-                                disabled: card.disabled,
-                                action: {
-                                    viewRouter.navigate(to: card.view)
-                                }
-                            )
+        ScrollView {
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(appCards) { card in
+                    FeatureCard(
+                        title: card.title,
+                        description: card.description,
+                        disabled: card.disabled,
+                        action: {
+                            viewRouter.navigate(to: card.view)
                         }
-                    }
-                    .padding()
+                    )
                 }
             }
+            .padding()
         }
+        .safeAreaInset(edge: .top) {
+            AppHeaderView(
+                title: "Maistro",
+                showBackButton: false,
+                showSettingsButton: true,
+                onBack: {},
+                onSettings: {
+                    showingThemeSheet = true
+                }
+            )
+        }
+        .background(
+            themeManager.colors.neutral
+                .ignoresSafeArea()
+        )
         .sheet(isPresented: $showingThemeSheet) {
             ThemePickerSheet()
         }

@@ -52,41 +52,41 @@ struct ComingSoonView: View {
     let viewName: String
 
     var body: some View {
-        ZStack {
+        VStack {
+            Spacer()
+
+            VStack(spacing: 16) {
+                Image(systemName: "hammer.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(themeManager.colors.primaryAccent)
+
+                Text("Coming Soon")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(themeManager.colors.textNeutral)
+
+                Text("This feature is under development")
+                    .font(.body)
+                    .foregroundColor(themeManager.colors.textNeutral.opacity(0.7))
+            }
+
+            Spacer()
+        }
+        .safeAreaInset(edge: .top) {
+            AppHeaderView(
+                title: viewName,
+                showBackButton: true,
+                showSettingsButton: false,
+                onBack: {
+                    viewRouter.goBack()
+                },
+                onSettings: {}
+            )
+        }
+        .background(
             themeManager.colors.neutral
                 .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                AppHeaderView(
-                    title: "Maistro",
-                    subtitle: viewName,
-                    showBackButton: true,
-                    showSettingsButton: false,
-                    onBack: {
-                        viewRouter.goBack()
-                    }
-                )
-
-                Spacer()
-
-                VStack(spacing: 16) {
-                    Image(systemName: "hammer.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(themeManager.colors.primaryAccent)
-
-                    Text("Coming Soon")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundColor(themeManager.colors.textNeutral)
-
-                    Text("This feature is under development")
-                        .font(.body)
-                        .foregroundColor(themeManager.colors.textNeutral.opacity(0.7))
-                }
-
-                Spacer()
-            }
-        }
+        )
     }
 }
 

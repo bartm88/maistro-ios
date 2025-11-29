@@ -9,22 +9,19 @@ struct AppHeaderView: View {
     @EnvironmentObject var themeManager: ThemeManager
 
     let title: String
-    let subtitle: String?
     let showBackButton: Bool
     let showSettingsButton: Bool
     let onBack: (() -> Void)?
     let onSettings: (() -> Void)?
 
     init(
-        title: String = "Maistro",
-        subtitle: String? = nil,
-        showBackButton: Bool = false,
-        showSettingsButton: Bool = true,
-        onBack: (() -> Void)? = nil,
-        onSettings: (() -> Void)? = nil
+        title: String,
+        showBackButton: Bool,
+        showSettingsButton: Bool,
+        onBack: (() -> Void)?,
+        onSettings: (() -> Void)?
     ) {
         self.title = title
-        self.subtitle = subtitle
         self.showBackButton = showBackButton
         self.showSettingsButton = showSettingsButton
         self.onBack = onBack
@@ -41,34 +38,20 @@ struct AppHeaderView: View {
                     size: .small,
                     action: { onBack?() }
                 )
+                .padding()
             } else {
                 Spacer()
                     .frame(width: 36)
+                    .padding()
             }
 
             Spacer()
 
-            // Center - Title and subtitle
-            VStack(spacing: 4) {
-                Text(title)
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(themeManager.colors.textNeutral)
-
-                if let subtitle = subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(themeManager.colors.textPrimary)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(themeManager.colors.neutral)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-            )
+            // Center - Title
+            Text(title)
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(themeManager.colors.textNeutral)
 
             Spacer()
 
@@ -80,20 +63,20 @@ struct AppHeaderView: View {
                     size: .small,
                     action: { onSettings?() }
                 )
+                .padding()
             } else {
                 Spacer()
                     .frame(width: 36)
+                    .padding()
             }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
+        .background(themeManager.colors.primary.opacity(0.7))
     }
 }
 
 #Preview {
     AppHeaderView(
-        title: "Maistro",
-        subtitle: "Rhythm Practice",
+        title: "Rhythm Practice",
         showBackButton: true,
         showSettingsButton: true,
         onBack: {},

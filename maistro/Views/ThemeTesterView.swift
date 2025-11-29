@@ -8,151 +8,132 @@ import SwiftUI
 struct ThemeTesterView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var viewRouter: ViewRouter
+    @State private var showingThemeSheet = false
 
     var body: some View {
-        ZStack {
+        ScrollView {
+            VStack(spacing: 24) {
+
+                // Color swatches
+                VStack(alignment: .leading, spacing: 16) {
+                    ColorSwatchRow(title: "Primary", colors: [
+                        ("primary", themeManager.colors.primary),
+                        ("textPrimary", themeManager.colors.textPrimary),
+                        ("primaryHover", themeManager.colors.primaryHover),
+                        ("primaryAccent", themeManager.colors.primaryAccent)
+                    ])
+
+                    ColorSwatchRow(title: "Secondary", colors: [
+                        ("secondary", themeManager.colors.secondary),
+                        ("textSecondary", themeManager.colors.textSecondary),
+                        ("secondaryHover", themeManager.colors.secondaryHover),
+                        ("secondaryAccent", themeManager.colors.secondaryAccent)
+                    ])
+
+                    ColorSwatchRow(title: "Neutral", colors: [
+                        ("neutral", themeManager.colors.neutral),
+                        ("textNeutral", themeManager.colors.textNeutral),
+                        ("neutralHover", themeManager.colors.neutralHover),
+                        ("neutralAccent", themeManager.colors.neutralAccent)
+                    ])
+
+                    ColorSwatchRow(title: "Confirmation", colors: [
+                        ("confirmation", themeManager.colors.confirmation),
+                        ("textConfirmation", themeManager.colors.textConfirmation),
+                        ("confirmationHover", themeManager.colors.confirmationHover),
+                        ("confirmationAccent", themeManager.colors.confirmationAccent)
+                    ])
+
+                    ColorSwatchRow(title: "Negative", colors: [
+                        ("negative", themeManager.colors.negative),
+                        ("textNegative", themeManager.colors.textNegative),
+                        ("negativeHover", themeManager.colors.negativeHover),
+                        ("negativeAccent", themeManager.colors.negativeAccent)
+                    ])
+                }
+                .padding(.horizontal)
+
+                Divider()
+                    .background(themeManager.colors.neutralAccent)
+                    .padding(.horizontal)
+
+                // Button examples
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Buttons")
+                        .font(.headline)
+                        .foregroundColor(themeManager.colors.textNeutral)
+
+                    HStack(spacing: 12) {
+                        ThemedButton("Primary", type: .primary, action: {})
+                        ThemedButton("Secondary", type: .secondary, action: {})
+                    }
+
+                    HStack(spacing: 12) {
+                        ThemedButton("Neutral", type: .neutral, action: {})
+                        ThemedButton("Confirm", type: .confirmation, action: {})
+                        ThemedButton("Negative", type: .negative, action: {})
+                    }
+
+                    HStack(spacing: 12) {
+                        ThemedButton(systemName: "plus", type: .primary, action: {})
+                        ThemedButton(systemName: "minus", type: .secondary, action: {})
+                        ThemedButton(systemName: "circle", type: .neutral, action: {})
+
+                        ThemedButton(systemName: "xmark", type: .negative, action: {})
+                        ThemedButton(systemName: "checkmark", type: .confirmation, action: {})
+                    }
+                }
+                .padding(.horizontal)
+
+                Divider()
+                    .background(themeManager.colors.neutralAccent)
+                    .padding(.horizontal)
+
+                // Card examples
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Cards")
+                        .font(.headline)
+                        .foregroundColor(themeManager.colors.textNeutral)
+
+                    FeatureCard(
+                        title: "Enabled Card",
+                        description: "This is an example of an enabled feature card",
+                        disabled: false,
+                        action: {}
+                    )
+
+                    FeatureCard(
+                        title: "Disabled Card",
+                        description: "This is an example of a disabled feature card",
+                        disabled: true,
+                        action: {}
+                    )
+                }
+                .padding(.horizontal)
+
+                Spacer(minLength: 40)
+            }
+            .padding(.vertical)
+        }
+        .safeAreaInset(edge: .top) {
+            AppHeaderView(
+                title: "Theme Tester",
+                showBackButton: true,
+                showSettingsButton: true,
+                onBack: {
+                    viewRouter.goBack()
+                },
+                onSettings: {
+                    showingThemeSheet = true
+                }
+            )
+        }
+        .background(
             themeManager.colors.neutral
                 .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                // Header
-                AppHeaderView(
-                    title: "Maistro",
-                    subtitle: "Theme Tester",
-                    showBackButton: true,
-                    showSettingsButton: false,
-                    onBack: {
-                        viewRouter.goBack()
-                    }
-                )
-
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Current theme info
-                        Text("Current Theme: \(themeManager.currentTheme.displayName)")
-                            .font(.headline)
-                            .foregroundColor(themeManager.colors.textNeutral)
-                            .padding()
-
-                        // Theme selector
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(Theme.allCases) { theme in
-                                    ThemePreviewButton(
-                                        theme: theme,
-                                        isSelected: themeManager.currentTheme == theme
-                                    ) {
-                                        themeManager.currentTheme = theme
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-
-                        Divider()
-                            .background(themeManager.colors.neutralAccent)
-                            .padding(.horizontal)
-
-                        // Color swatches
-                        VStack(alignment: .leading, spacing: 16) {
-                            ColorSwatchRow(title: "Primary", colors: [
-                                ("primary", themeManager.colors.primary),
-                                ("textPrimary", themeManager.colors.textPrimary),
-                                ("primaryHover", themeManager.colors.primaryHover),
-                                ("primaryAccent", themeManager.colors.primaryAccent)
-                            ])
-
-                            ColorSwatchRow(title: "Secondary", colors: [
-                                ("secondary", themeManager.colors.secondary),
-                                ("textSecondary", themeManager.colors.textSecondary),
-                                ("secondaryHover", themeManager.colors.secondaryHover),
-                                ("secondaryAccent", themeManager.colors.secondaryAccent)
-                            ])
-
-                            ColorSwatchRow(title: "Neutral", colors: [
-                                ("neutral", themeManager.colors.neutral),
-                                ("textNeutral", themeManager.colors.textNeutral),
-                                ("neutralHover", themeManager.colors.neutralHover),
-                                ("neutralAccent", themeManager.colors.neutralAccent)
-                            ])
-
-                            ColorSwatchRow(title: "Confirmation", colors: [
-                                ("confirmation", themeManager.colors.confirmation),
-                                ("textConfirmation", themeManager.colors.textConfirmation),
-                                ("confirmationHover", themeManager.colors.confirmationHover),
-                                ("confirmationAccent", themeManager.colors.confirmationAccent)
-                            ])
-
-                            ColorSwatchRow(title: "Negative", colors: [
-                                ("negative", themeManager.colors.negative),
-                                ("textNegative", themeManager.colors.textNegative),
-                                ("negativeHover", themeManager.colors.negativeHover),
-                                ("negativeAccent", themeManager.colors.negativeAccent)
-                            ])
-                        }
-                        .padding(.horizontal)
-
-                        Divider()
-                            .background(themeManager.colors.neutralAccent)
-                            .padding(.horizontal)
-
-                        // Button examples
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Buttons")
-                                .font(.headline)
-                                .foregroundColor(themeManager.colors.textNeutral)
-
-                            HStack(spacing: 12) {
-                                ThemedButton("Primary", type: .primary, action: {})
-                                ThemedButton("Secondary", type: .secondary, action: {})
-                            }
-
-                            HStack(spacing: 12) {
-                                ThemedButton("Neutral", type: .neutral, action: {})
-                                ThemedButton("Confirm", type: .confirmation, action: {})
-                                ThemedButton("Negative", type: .negative, action: {})
-                            }
-
-                            HStack(spacing: 12) {
-                                ThemedButton(systemName: "plus", type: .primary, action: {})
-                                ThemedButton(systemName: "minus", type: .secondary, action: {})
-                                ThemedButton(systemName: "xmark", type: .negative, action: {})
-                                ThemedButton(systemName: "checkmark", type: .confirmation, action: {})
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        Divider()
-                            .background(themeManager.colors.neutralAccent)
-                            .padding(.horizontal)
-
-                        // Card examples
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Cards")
-                                .font(.headline)
-                                .foregroundColor(themeManager.colors.textNeutral)
-
-                            FeatureCard(
-                                title: "Enabled Card",
-                                description: "This is an example of an enabled feature card",
-                                disabled: false,
-                                action: {}
-                            )
-
-                            FeatureCard(
-                                title: "Disabled Card",
-                                description: "This is an example of a disabled feature card",
-                                disabled: true,
-                                action: {}
-                            )
-                        }
-                        .padding(.horizontal)
-
-                        Spacer(minLength: 40)
-                    }
-                    .padding(.vertical)
-                }
-            }
+        )
+        .sheet(isPresented: $showingThemeSheet) {
+            ThemePickerSheet()
         }
     }
 }
