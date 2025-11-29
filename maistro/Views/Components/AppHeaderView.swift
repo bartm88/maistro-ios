@@ -51,7 +51,7 @@ struct AppHeaderView: View {
             Text(title)
                 .font(.title)
                 .fontWeight(.bold)
-                .foregroundColor(themeManager.colors.textNeutral)
+                .foregroundColor(themeManager.colors.textPrimary)
 
             Spacer()
 

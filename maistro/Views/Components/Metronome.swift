@@ -275,8 +275,6 @@ struct PendulumView: View {
                 anchor: UnitPoint(x: 0.5, y: (barHeight) / barHeight)
             )
             .animation(
-//                .easeInOut(duration: duration),
-//                .default,
                 .linear(duration: duration),
                 value: rotation
             )
