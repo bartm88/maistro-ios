@@ -9,9 +9,12 @@ import AVFoundation
 class MetronomeEngine: ObservableObject {
     @Published var isPlaying = false
     @Published var tempo: Double = 120
+    @Published var beatPhase: Int = 0  // Alternates 0, 1, 0, 1... for left/right swing
 
     private var timer: Timer?
-    private var audioPlayer: AVAudioPlayer?
+    private var audioEngine: AVAudioEngine?
+    private var tonePlayer: AVAudioPlayerNode?
+    private var beepBuffer: AVAudioPCMBuffer?
 
     var minTempo: Double = 40
     var maxTempo: Double = 220
@@ -21,14 +24,51 @@ class MetronomeEngine: ObservableObject {
     }
 
     private func setupAudio() {
-        // Create a simple click sound using AudioServices or prepare a sound file
-        // For now, we'll use system sound
+        audioEngine = AVAudioEngine()
+        tonePlayer = AVAudioPlayerNode()
+
+        guard let audioEngine = audioEngine, let tonePlayer = tonePlayer else { return }
+
+        audioEngine.attach(tonePlayer)
+
+        // Create beep buffer - 1000Hz sine wave for 100ms
+        let sampleRate: Double = 44100
+        let frequency: Double = 1000
+        let duration: Double = 0.1
+        let frameCount = AVAudioFrameCount(sampleRate * duration)
+
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
+
+        buffer.frameLength = frameCount
+
+        if let channelData = buffer.floatChannelData?[0] {
+            for frame in 0..<Int(frameCount) {
+                let time = Double(frame) / sampleRate
+                // Sine wave with exponential decay envelope
+                let envelope = exp(-time * 30) // Quick decay
+                let sample = Float(sin(2.0 * .pi * frequency * time) * envelope * 0.5)
+                channelData[frame] = sample
+            }
+        }
+
+        beepBuffer = buffer
+
+        audioEngine.connect(tonePlayer, to: audioEngine.mainMixerNode, format: format)
+
+        do {
+            try audioEngine.start()
+        } catch {
+            print("Failed to start audio engine: \(error)")
+        }
     }
 
     func start() {
         guard !isPlaying else { return }
         isPlaying = true
+        beatPhase = 0
         scheduleTimer()
+        playBeep()
     }
 
     func stop() {
@@ -48,23 +88,36 @@ class MetronomeEngine: ObservableObject {
     func setTempo(_ newTempo: Double) {
         tempo = min(maxTempo, max(minTempo, newTempo))
         if isPlaying {
-            stop()
-            start()
+            // Restart timer with new tempo
+            timer?.invalidate()
+            scheduleTimer()
         }
     }
 
     private func scheduleTimer() {
         let interval = 60.0 / tempo
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            self?.playTick()
+            self?.tick()
         }
-        // Play first tick immediately
-        playTick()
     }
 
-    private func playTick() {
-        // Play system click sound
-        AudioServicesPlaySystemSound(1104) // Tock sound
+    private func tick() {
+        // Alternate beat phase for pendulum swing direction
+        beatPhase = beatPhase == 0 ? 1 : 0
+        playBeep()
+    }
+
+    private func playBeep() {
+        guard let tonePlayer = tonePlayer, let buffer = beepBuffer else { return }
+
+        // Stop any currently playing sound and play new beep
+        tonePlayer.stop()
+        tonePlayer.scheduleBuffer(buffer, at: nil, options: [], completionHandler: nil)
+        tonePlayer.play()
+    }
+
+    deinit {
+        audioEngine?.stop()
     }
 }
 
@@ -79,8 +132,6 @@ struct Metronome: View {
     let onTempoChange: ((Double) -> Void)?
 
     @State private var tempoText: String = ""
-    @State private var pendulumRotation: Double = 0
-    @State private var animateForward = true
 
     init(
         initialTempo: Double = 120,
@@ -96,6 +147,18 @@ struct Metronome: View {
         self.onTempoChange = onTempoChange
     }
 
+    // Calculate pendulum rotation based on beat phase
+    private var pendulumRotation: Double {
+        guard engine.isPlaying else { return 0 }
+        // Swing between -angle/2 and +angle/2
+        return engine.beatPhase == 0 ? -metronomeAngle / 2 : metronomeAngle / 2
+    }
+
+    // Animation duration is one beat (time to swing from one side to the other)
+    private var swingDuration: Double {
+        60.0 / engine.tempo
+    }
+
     var body: some View {
         VStack(spacing: 12) {
             // Metronome visual
@@ -106,19 +169,13 @@ struct Metronome: View {
                     .frame(width: 100, height: 50)
 
                 // Pendulum
-                Rectangle()
-                    .fill(themeManager.colors.textNeutral)
-                    .frame(width: 3, height: 50)
-                    .offset(y: -25)
-                    .rotationEffect(.degrees(engine.isPlaying ? pendulumRotation : 0), anchor: .bottom)
-                    .animation(
-                        engine.isPlaying ?
-                            .linear(duration: 60.0 / engine.tempo / 2).repeatForever(autoreverses: true) :
-                            .default,
-                        value: engine.isPlaying
-                    )
+                PendulumView(
+                    rotation: pendulumRotation,
+                    duration: swingDuration,
+                    color: themeManager.colors.textNeutral
+                )
 
-                // Base
+                // Base pivot point
                 Circle()
                     .fill(themeManager.colors.secondary)
                     .frame(width: 12, height: 12)
@@ -127,11 +184,6 @@ struct Metronome: View {
             .frame(height: 80)
             .onTapGesture {
                 engine.toggle()
-                if engine.isPlaying {
-                    pendulumRotation = metronomeAngle / 2
-                } else {
-                    pendulumRotation = 0
-                }
             }
 
             // Tempo slider
@@ -184,11 +236,6 @@ struct Metronome: View {
                 size: .small,
                 action: {
                     engine.toggle()
-                    if engine.isPlaying {
-                        pendulumRotation = metronomeAngle / 2
-                    } else {
-                        pendulumRotation = 0
-                    }
                 }
             )
         }
@@ -206,6 +253,32 @@ struct Metronome: View {
             engine.maxTempo = maxTempo
             tempoText = String(Int(initialTempo))
         }
+    }
+}
+
+// Separate view for pendulum to properly handle animation
+struct PendulumView: View {
+    let rotation: Double
+    let duration: Double
+    let color: Color
+
+    private let barHeight: CGFloat = 70  // 50 above pivot + 6 below (through circle)
+    private let pivotFromBottom: CGFloat = 6  // Pivot at circle center (radius 6)
+
+    var body: some View {
+        Rectangle()
+            .fill(color)
+            .frame(width: 3, height: barHeight)
+            .offset(y: -pivotFromBottom)
+            // Anchor at pivot point (6 from bottom)
+            .rotationEffect(
+                .degrees(rotation),
+                anchor: UnitPoint(x: 0.5, y: (barHeight - pivotFromBottom) / barHeight)
+            )
+            .animation(
+                .easeInOut(duration: duration),
+                value: rotation
+            )
     }
 }
 
