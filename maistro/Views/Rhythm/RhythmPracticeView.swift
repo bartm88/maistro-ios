@@ -16,10 +16,17 @@ struct RhythmPracticeView: View {
     @State private var showSettings = false
     @State private var isTapping = false
 
+    // Target passage for practice
+    @State private var targetPassage: DiscretePassage?
+
     // Evaluation scores (placeholder for now)
     @State private var durationScore: Double = 0
     @State private var rhythmScore: Double = 0
     @State private var pitchScore: Double = 0
+
+    private var parsedTimeSignature: TimeSignature {
+        TimeSignature(string: timeSignature) ?? TimeSignature(4, 4)
+    }
 
     var body: some View {
         ScrollView {
@@ -79,18 +86,25 @@ struct RhythmPracticeView: View {
                 // Sheet music displays
                 VStack(spacing: 16) {
                     // Target passage
-                    SheetMusicPlaceholder(
-                        label: "Target",
-                        measureCount: measureCount,
-                        timeSignature: timeSignature
-                    )
+                    if let passage = targetPassage {
+                        SheetMusicView(
+                            passage: passage,
+                            label: "Target",
+                            timeSignature: timeSignature
+                        )
+                    } else {
+                        SheetMusicView(
+                            notation: "",
+                            label: "Target",
+                            timeSignature: timeSignature
+                        )
+                    }
 
-                    // Played passage
-                    SheetMusicPlaceholder(
+                    // Played passage (placeholder for now - will show user's tapped rhythm)
+                    SheetMusicView(
+                        notation: "",
                         label: "Played",
-                        measureCount: measureCount,
-                        timeSignature: timeSignature,
-                        showEvaluation: true
+                        timeSignature: timeSignature
                     )
                 }
                 .padding(.horizontal)
@@ -131,6 +145,15 @@ struct RhythmPracticeView: View {
                 timeSignature: $timeSignature
             )
         }
+        .onAppear {
+            generateNewPassage()
+        }
+        .onChange(of: measureCount) { _, _ in
+            generateNewPassage()
+        }
+        .onChange(of: timeSignature) { _, _ in
+            generateNewPassage()
+        }
     }
 
     private func clearAttempt() {
@@ -141,7 +164,15 @@ struct RhythmPracticeView: View {
 
     private func newPassage() {
         clearAttempt()
-        // Generate new target passage
+        generateNewPassage()
+    }
+
+    private func generateNewPassage() {
+        targetPassage = PassageGenerator.shared.generatePassage(
+            measureCount: measureCount,
+            timeSignature: parsedTimeSignature,
+            smallestSubdivision: 8
+        )
     }
 
     private func sendTapDown() {
@@ -193,63 +224,6 @@ struct TapButton: View {
                         onTapUp()
                     }
             )
-    }
-}
-
-struct SheetMusicPlaceholder: View {
-    @EnvironmentObject var themeManager: ThemeManager
-
-    let label: String
-    let measureCount: Int
-    let timeSignature: String
-    var showEvaluation: Bool = false
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(label)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(themeManager.colors.textNeutral)
-                .frame(width: 50, alignment: .leading)
-
-            // Sheet music placeholder
-            HStack(spacing: 2) {
-                // Clef placeholder
-                Image(systemName: "music.note")
-                    .font(.title2)
-                    .foregroundColor(themeManager.colors.textNeutral)
-
-                // Time signature
-                Text(timeSignature)
-                    .font(.caption)
-                    .foregroundColor(themeManager.colors.textNeutral)
-
-                // Measures
-                ForEach(0..<measureCount, id: \.self) { _ in
-                    Rectangle()
-                        .stroke(themeManager.colors.textNeutral.opacity(0.3), lineWidth: 1)
-                        .frame(height: 60)
-                        .overlay(
-                            // Staff lines
-                            VStack(spacing: 10) {
-                                ForEach(0..<5, id: \.self) { _ in
-                                    Rectangle()
-                                        .fill(themeManager.colors.textNeutral.opacity(0.3))
-                                        .frame(height: 1)
-                                }
-                            }
-                            .padding(.vertical, 5)
-                        )
-                }
-            }
-            .padding()
-            .background(Color.white)
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-            )
-        }
     }
 }
 

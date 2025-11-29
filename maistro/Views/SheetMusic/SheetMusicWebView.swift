@@ -10,9 +10,17 @@ struct SheetMusicWebView: UIViewRepresentable {
     let notation: String
     let width: CGFloat
     let height: CGFloat
+    let timeSignature: String
+
+    init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String = "4/4") {
+        self.notation = notation
+        self.width = width
+        self.height = height
+        self.timeSignature = timeSignature
+    }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(notation: notation, width: width, height: height)
+        Coordinator(notation: notation, width: width, height: height, timeSignature: timeSignature)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -35,6 +43,7 @@ struct SheetMusicWebView: UIViewRepresentable {
         context.coordinator.notation = notation
         context.coordinator.width = width
         context.coordinator.height = height
+        context.coordinator.timeSignature = timeSignature
 
         if context.coordinator.isLoaded {
             context.coordinator.renderNotation(webView: webView)
@@ -45,12 +54,14 @@ struct SheetMusicWebView: UIViewRepresentable {
         var notation: String
         var width: CGFloat
         var height: CGFloat
+        var timeSignature: String
         var isLoaded = false
 
-        init(notation: String, width: CGFloat, height: CGFloat) {
+        init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String) {
             self.notation = notation
             self.width = width
             self.height = height
+            self.timeSignature = timeSignature
         }
 
         func loadVexFlowHTML(webView: WKWebView) {
@@ -135,8 +146,8 @@ struct SheetMusicWebView: UIViewRepresentable {
                 .replacingOccurrences(of: "\"", with: "\\\"")
                 .replacingOccurrences(of: "\n", with: "\\n")
 
-            let js = "renderNotation(\"\(escapedNotation)\", \(width), \(height));"
-            print("[VexFlow] Executing JS: \(js.prefix(100))...")
+            let js = "renderNotation(\"\(escapedNotation)\", \(width), \(height), \"\(timeSignature)\");"
+            print("[VexFlow] Executing JS: \(js.prefix(120))...")
 
             webView.evaluateJavaScript(js) { result, error in
                 if let error = error {
@@ -158,12 +169,84 @@ struct SheetMusicView: View {
     let label: String?
     let width: CGFloat
     let height: CGFloat
+    let timeSignature: String
 
-    init(notation: String, label: String? = nil, width: CGFloat = 300, height: CGFloat = 120) {
+    // Layout constants matching the JavaScript
+    private static let firstMeasureAdditionalWidth: CGFloat = 50
+    private static let measureHeight: CGFloat = 75
+
+    init(notation: String, label: String? = nil, width: CGFloat = 300, height: CGFloat = 120, timeSignature: String = "4/4") {
         self.notation = notation
         self.label = label
         self.width = width
         self.height = height
+        self.timeSignature = timeSignature
+    }
+
+    /// Initialize with a DiscretePassage (calculates dimensions automatically)
+    init(passage: DiscretePassage, label: String? = nil, timeSignature: String = "4/4") {
+        // Convert passage to JSON string for JavaScript
+        // Note: Do NOT use convertToSnakeCase - the JS expects camelCase (noteDurations, noteName, etc.)
+        let encoder = JSONEncoder()
+        if let jsonData = try? encoder.encode(passage),
+           let jsonString = String(data: jsonData, encoding: .utf8) {
+            self.notation = jsonString
+        } else {
+            self.notation = ""
+        }
+        self.label = label
+        self.timeSignature = timeSignature
+
+        // Calculate dimensions based on passage content
+        let dimensions = Self.computeDimensions(for: passage)
+        self.width = dimensions.width
+        self.height = dimensions.height
+    }
+
+    /// Compute dimensions based on measure content (mirrors JavaScript logic)
+    private static func computeDimensions(for passage: DiscretePassage) -> (width: CGFloat, height: CGFloat) {
+        let measures = passage.measures
+        guard !measures.isEmpty else {
+            return (width: 300, height: 120)
+        }
+
+        // Find max glyphs in any single measure
+        var maxGlyph = 0
+        for measure in measures {
+            var glyphsInMeasure = 0
+            for element in measure.elements {
+                switch element.element {
+                case .note(let note):
+                    glyphsInMeasure += note.noteDurations.count
+                case .rest(let rest):
+                    glyphsInMeasure += rest.restDurations.count
+                }
+            }
+            maxGlyph = max(maxGlyph, glyphsInMeasure)
+        }
+
+        // Determine measure width and measures per line based on glyph density
+        let measureWidth: CGFloat
+        let measuresPerLine: Int
+        if maxGlyph <= 8 {
+            measureWidth = 190
+            measuresPerLine = 3
+        } else if maxGlyph <= 16 {
+            measureWidth = 285
+            measuresPerLine = 2
+        } else {
+            measureWidth = 560
+            measuresPerLine = 1
+        }
+
+        // Calculate total dimensions
+        let numLines = max(1, Int(ceil(Double(measures.count) / Double(measuresPerLine))))
+        let measuresOnFirstLine = min(measuresPerLine, measures.count)
+
+        let width = firstMeasureAdditionalWidth + measureWidth * CGFloat(measuresOnFirstLine) + 20
+        let height = 50 + measureHeight * CGFloat(numLines)
+
+        return (width: width, height: height)
     }
 
     var body: some View {
@@ -176,7 +259,7 @@ struct SheetMusicView: View {
                     .frame(width: 50, alignment: .leading)
             }
 
-            SheetMusicWebView(notation: notation, width: width, height: height)
+            SheetMusicWebView(notation: notation, width: width, height: height, timeSignature: timeSignature)
                 .frame(width: width, height: height)
                 .background(Color.white)
                 .cornerRadius(8)
@@ -279,11 +362,90 @@ struct NotePreview: View {
 // MARK: - Previews
 
 #Preview("Live WebView") {
-    SheetMusicView(
-        notation: "C4/q, D4/q, E4/q, F4/q",
-        label: "Target",
-        width: 300,
-        height: 120
-    )
-    .environmentObject(ThemeManager.shared)
+    VStack(spacing: 20) {
+        SheetMusicView(
+            notation: "C4/q, D4/q, E4/q, F4/q",
+            label: "Target",
+            width: 300,
+            height: 120
+        )
+        .environmentObject(ThemeManager.shared)
+
+        SheetMusicView(
+            passage: DiscretePassage.samplePassage,
+            label: "Sample"
+        )
+        .environmentObject(ThemeManager.shared)
+    }
+}
+
+// MARK: - Sample Passage for Previews
+
+extension DiscretePassage {
+    /// A sample passage for SwiftUI previews: two measures in 4/4 with varied rhythms
+    static let samplePassage: DiscretePassage = {
+        // Measure 1: quarter, quarter, half
+        let measure1 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 0
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 2
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4
+                )
+            ]
+        )
+
+        // Measure 2: dotted quarter, eighth, quarter rest, quarter
+        let measure2 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 1)]
+                    )),
+                    startSubdivision: 0
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 8, dots: 0)]
+                    )),
+                    startSubdivision: 3
+                ),
+                DiscreteMeasureElement(
+                    element: .rest(DiscreteRest(
+                        restDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 4
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 6
+                )
+            ]
+        )
+
+        return DiscretePassage(measures: [measure1, measure2])
+    }()
 }

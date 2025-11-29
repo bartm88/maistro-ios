@@ -23,15 +23,147 @@
     <div id="output"></div>
 
     <script>
-        const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex.Flow;
+        const { Factory, Renderer, Stave, StaveNote, Voice, Formatter, Accidental, StaveTie } = Vex.Flow;
 
         let renderer = null;
         let context = null;
 
-        function renderNotation(notationString, width, height) {
+        // Main render function - supports both simple notation and JSON passage
+        function renderNotation(notationString, width, height, timeSignature = '4/4') {
+            console.log('[VexFlow] renderNotation called:', { notationString: notationString.substring(0, 50), width, height, timeSignature });
+
             const container = document.getElementById('output');
             container.innerHTML = '';
 
+            // Try to parse as JSON passage first
+            try {
+                if (notationString.startsWith('{') || notationString.startsWith('[')) {
+                    const passage = JSON.parse(notationString);
+                    renderPassage(passage, container, width, height, timeSignature);
+                    return;
+                }
+            } catch (e) {
+                console.log('[VexFlow] Not JSON, parsing as simple notation');
+            }
+
+            // Fall back to simple notation parsing
+            renderSimpleNotation(notationString, container, width, height, timeSignature);
+        }
+
+        const FIRST_MEASURE_ADDITIONAL_WIDTH = 50;
+        const MEASURE_HEIGHT = 75;
+        const MEASURE_Y_OFFSET = 0;
+
+        // Compute measure dimensions based on max glyphs in any measure
+        function computeMeasureDimensions(measures) {
+            let maxGlyph = 0;
+
+            measures.forEach((measure) => {
+                let glyphsInMeasure = 0;
+                measure.elements.forEach((element) => {
+                    if (element.element.Note) {
+                        glyphsInMeasure += element.element.Note.noteDurations.length;
+                    }
+                    if (element.element.Rest) {
+                        glyphsInMeasure += element.element.Rest.restDurations.length;
+                    }
+                });
+                if (glyphsInMeasure > maxGlyph) {
+                    maxGlyph = glyphsInMeasure;
+                }
+            });
+
+            // Max 3 measures per line, fewer if measures have many glyphs
+            if (maxGlyph <= 8) {
+                return { measureWidth: 190, measuresPerLine: 3 };
+            } else if (maxGlyph <= 16) {
+                return { measureWidth: 285, measuresPerLine: 2 };
+            } else {
+                return { measureWidth: 560, measuresPerLine: 1 };
+            }
+        }
+
+        // Render a discrete passage (JSON format from Swift)
+        function renderPassage(passage, container, width, height, timeSignature) {
+            const measures = passage.measures || [];
+            console.log('[VexFlow] Rendering passage with', measures.length, 'measures');
+
+            const { measureWidth, measuresPerLine } = computeMeasureDimensions(measures);
+            const numLines = Math.max(1, Math.ceil(measures.length / measuresPerLine));
+            const requiredHeight = MEASURE_HEIGHT * numLines;
+
+            console.log('[VexFlow] Layout:', { measureWidth, measuresPerLine, numLines, requiredHeight });
+
+            const factory = new Factory({
+                renderer: { elementId: 'output', width: width, height: Math.max(height, requiredHeight) }
+            });
+
+            const score = factory.EasyScore();
+            score.set({ time: timeSignature });
+
+            measures.forEach((measure, measureIndex) => {
+                const voiceNotes = [];
+                let tieStartNote = null;
+
+                measure.elements.forEach((element) => {
+                    if (element.element.Note) {
+                        const note = element.element.Note;
+                        note.noteDurations.forEach((duration, durationIndex) => {
+                            const noteStr = `${note.noteName}/${duration.denominator}${'.'.repeat(duration.dots)}`;
+                            const staveNotes = score.notes(noteStr);
+
+                            if (durationIndex > 0 && tieStartNote) {
+                                // Need to tie to previous note
+                                factory.StaveTie({ from: tieStartNote, to: staveNotes[0] });
+                            }
+
+                            tieStartNote = staveNotes[0];
+                            voiceNotes.push(...staveNotes);
+                        });
+                    } else if (element.element.Rest) {
+                        const rest = element.element.Rest;
+                        rest.restDurations.forEach((duration) => {
+                            const restStr = `B4/${duration.denominator}${'.'.repeat(duration.dots)}/r`;
+                            const staveNotes = score.notes(restStr);
+                            voiceNotes.push(...staveNotes);
+                        });
+                        tieStartNote = null;
+                    }
+                });
+
+                if (voiceNotes.length > 0) {
+                    const voice = score.voice(voiceNotes);
+                    const lineIndex = Math.floor(measureIndex / measuresPerLine);
+                    const positionInLine = measureIndex % measuresPerLine;
+                    const y = MEASURE_Y_OFFSET + MEASURE_HEIGHT * lineIndex;
+
+                    // First measure of each line gets clef (and time signature on very first measure)
+                    if (positionInLine === 0) {
+                        const system = factory.System({
+                            width: FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth,
+                            x: 10,
+                            y: y
+                        });
+                        const stave = system.addStave({ voices: [voice] }).addClef('treble');
+                        if (measureIndex === 0) {
+                            stave.addTimeSignature(timeSignature);
+                        }
+                    } else {
+                        const system = factory.System({
+                            width: measureWidth,
+                            x: 10 + FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth * positionInLine,
+                            y: y
+                        });
+                        system.addStave({ voices: [voice] });
+                    }
+                }
+            });
+
+            factory.draw();
+        }
+
+        // Render simple comma-separated notation string
+        function renderSimpleNotation(notationString, container, width, height, timeSignature) {
             renderer = new Renderer(container, Renderer.Backends.SVG);
             renderer.resize(width, height);
             context = renderer.getContext();
@@ -40,13 +172,14 @@
             const staveWidth = width - 20;
             const stave = new Stave(10, 10, staveWidth);
             stave.addClef('treble');
-            stave.addTimeSignature('4/4');
+            stave.addTimeSignature(timeSignature);
             stave.setContext(context).draw();
 
-            const notes = parseNotation(notationString);
+            const notes = parseSimpleNotation(notationString);
 
             if (notes.length > 0) {
-                const voice = new Voice({ num_beats: 4, beat_value: 4 }).setStrict(false);
+                const [num, denom] = timeSignature.split('/').map(Number);
+                const voice = new Voice({ num_beats: num, beat_value: denom }).setStrict(false);
                 voice.addTickables(notes);
 
                 new Formatter().joinVoices([voice]).format([voice], staveWidth - 80);
@@ -54,7 +187,8 @@
             }
         }
 
-        function parseNotation(notationString) {
+        // Parse simple notation format: "C4/q, D4/8, E4/4., B4/4/r"
+        function parseSimpleNotation(notationString) {
             if (!notationString || notationString.trim() === '') {
                 return [];
             }
@@ -67,7 +201,8 @@
                 if (parts.length < 2) continue;
 
                 const pitchPart = parts[0].trim();
-                const durationPart = parts[1].trim();
+                let durationPart = parts[1].trim();
+                const isRest = parts.length > 2 && parts[2].trim().toLowerCase() === 'r';
 
                 // Parse pitch (e.g., "C4", "C#4", "Bb3")
                 const pitchMatch = pitchPart.match(/^([A-Ga-g])([#bn]?)(\d)$/);
@@ -77,8 +212,28 @@
                 const accidental = pitchMatch[2];
                 const octave = pitchMatch[3];
 
-                // Parse duration (q=quarter, h=half, w=whole, 8=eighth, 16=sixteenth)
+                // Handle dots in duration
+                let dots = 0;
+                while (durationPart.endsWith('.')) {
+                    dots++;
+                    durationPart = durationPart.slice(0, -1);
+                }
+
+                // Convert duration to VexFlow format
                 let duration = durationPart;
+                // Map letter durations to numbers if needed
+                const durationMap = { 'w': '1', 'h': '2', 'q': '4' };
+                if (durationMap[duration]) {
+                    duration = durationMap[duration];
+                }
+
+                // Add dots back
+                duration = duration + 'd'.repeat(dots);
+
+                // Add rest suffix if needed
+                if (isRest) {
+                    duration = duration + 'r';
+                }
 
                 // Create the note
                 const key = noteName + '/' + octave;
@@ -104,7 +259,8 @@
 
         // Render empty staff on load
         window.onload = function() {
-            renderNotation('', 300, 120);
+            console.log('[VexFlow] Page loaded, rendering empty staff');
+            renderNotation('', 300, 120, '4/4');
         };
     </script>
 </body>
