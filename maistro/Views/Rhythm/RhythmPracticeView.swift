@@ -24,54 +24,51 @@ struct RhythmPracticeView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                // Top controls row
-                HStack {
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        ThemedButton(
-                            systemName: "arrow.counterclockwise",
-                            type: .neutral,
-                            size: .small,
-                            action: clearAttempt
-                        )
-
-                        ThemedButton(
-                            systemName: "forward.fill",
-                            type: .neutral,
-                            size: .small,
-                            action: newPassage
-                        )
-
-                        ThemedButton(
-                            systemName: "gearshape",
-                            type: .neutral,
-                            size: .small,
-                            action: { showSettings = true }
-                        )
-                    }
-                }
-                .padding(.horizontal)
-
-                // Evaluation and Metronome row
+                // Two-column layout: Evaluation chart | Controls + Metronome
                 HStack(alignment: .top, spacing: 16) {
-                    // Evaluation chart placeholder
+                    // Column 1: Evaluation chart
                     EvaluationChartView(
                         durationScore: durationScore,
                         rhythmScore: rhythmScore,
-                        pitchScore: pitchScore
+                        pitchScore: pitchScore,
+                        width: 200,
+                        height: 290
                     )
-                    .frame(width: 180, height: 180)
 
-                    Spacer()
+                    // Column 2: Controls and Metronome
+                    VStack(spacing: 16) {
+                        // Top row: 3 control buttons
+                        HStack(spacing: 8) {
+                            ThemedButton(
+                                systemName: "arrow.counterclockwise",
+                                type: .neutral,
+                                size: .small,
+                                action: clearAttempt
+                            )
 
-                    // Metronome
-                    Metronome(
-                        initialTempo: tempo,
-                        onTempoChange: { newTempo in
-                            tempo = newTempo
+                            ThemedButton(
+                                systemName: "forward.fill",
+                                type: .neutral,
+                                size: .small,
+                                action: newPassage
+                            )
+
+                            ThemedButton(
+                                systemName: "gearshape",
+                                type: .neutral,
+                                size: .small,
+                                action: { showSettings = true }
+                            )
                         }
-                    )
+
+                        // Bottom row: Metronome
+                        Metronome(
+                            initialTempo: tempo,
+                            onTempoChange: { newTempo in
+                                tempo = newTempo
+                            }
+                        )
+                    }
                 }
                 .padding(.horizontal)
 
@@ -192,71 +189,6 @@ struct TapButton: View {
                         onTapUp()
                     }
             )
-    }
-}
-
-struct EvaluationChartView: View {
-    @EnvironmentObject var themeManager: ThemeManager
-
-    let durationScore: Double
-    let rhythmScore: Double
-    let pitchScore: Double
-
-    var body: some View {
-        VStack {
-            // Simple bar chart visualization
-            HStack(alignment: .bottom, spacing: 12) {
-                ScoreBar(label: "Duration", score: durationScore)
-                ScoreBar(label: "Rhythm", score: rhythmScore)
-                ScoreBar(label: "Pitch", score: pitchScore)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding()
-        .background(themeManager.colors.neutral)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-        )
-    }
-}
-
-struct ScoreBar: View {
-    @EnvironmentObject var themeManager: ThemeManager
-
-    let label: String
-    let score: Double
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ZStack(alignment: .bottom) {
-                Rectangle()
-                    .fill(themeManager.colors.neutral.opacity(0.5))
-                    .frame(width: 30, height: 100)
-
-                Rectangle()
-                    .fill(scoreColor)
-                    .frame(width: 30, height: CGFloat(score * 100))
-            }
-            .cornerRadius(4)
-
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(themeManager.colors.textNeutral)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-        }
-    }
-
-    var scoreColor: Color {
-        if score >= 0.8 {
-            return themeManager.colors.confirmation
-        } else if score >= 0.5 {
-            return themeManager.colors.primary
-        } else {
-            return themeManager.colors.negative
-        }
     }
 }
 
