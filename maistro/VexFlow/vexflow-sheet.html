@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            background: transparent;
+            overflow: hidden;
+        }
+        #output {
+            background: transparent;
+        }
+    </style>
+    <script src="vexflow.js"></script>
+</head>
+<body>
+    <div id="output"></div>
+
+    <script>
+        const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex.Flow;
+
+        let renderer = null;
+        let context = null;
+
+        function renderNotation(notationString, width, height) {
+            const container = document.getElementById('output');
+            container.innerHTML = '';
+
+            renderer = new Renderer(container, Renderer.Backends.SVG);
+            renderer.resize(width, height);
+            context = renderer.getContext();
+            context.setFont('Arial', 10);
+
+            const staveWidth = width - 20;
+            const stave = new Stave(10, 10, staveWidth);
+            stave.addClef('treble');
+            stave.addTimeSignature('4/4');
+            stave.setContext(context).draw();
+
+            const notes = parseNotation(notationString);
+
+            if (notes.length > 0) {
+                const voice = new Voice({ num_beats: 4, beat_value: 4 }).setStrict(false);
+                voice.addTickables(notes);
+
+                new Formatter().joinVoices([voice]).format([voice], staveWidth - 80);
+                voice.draw(context, stave);
+            }
+        }
+
+        function parseNotation(notationString) {
+            if (!notationString || notationString.trim() === '') {
+                return [];
+            }
+
+            const noteStrings = notationString.split(',').map(s => s.trim());
+            const notes = [];
+
+            for (const noteStr of noteStrings) {
+                const parts = noteStr.split('/');
+                if (parts.length < 2) continue;
+
+                const pitchPart = parts[0].trim();
+                const durationPart = parts[1].trim();
+
+                // Parse pitch (e.g., "C4", "C#4", "Bb3")
+                const pitchMatch = pitchPart.match(/^([A-Ga-g])([#bn]?)(\d)$/);
+                if (!pitchMatch) continue;
+
+                const noteName = pitchMatch[1].toLowerCase();
+                const accidental = pitchMatch[2];
+                const octave = pitchMatch[3];
+
+                // Parse duration (q=quarter, h=half, w=whole, 8=eighth, 16=sixteenth)
+                let duration = durationPart;
+
+                // Create the note
+                const key = noteName + '/' + octave;
+                const staveNote = new StaveNote({
+                    keys: [key],
+                    duration: duration
+                });
+
+                // Add accidental if present
+                if (accidental === '#') {
+                    staveNote.addModifier(new Accidental('#'), 0);
+                } else if (accidental === 'b') {
+                    staveNote.addModifier(new Accidental('b'), 0);
+                } else if (accidental === 'n') {
+                    staveNote.addModifier(new Accidental('n'), 0);
+                }
+
+                notes.push(staveNote);
+            }
+
+            return notes;
+        }
+
+        // Render empty staff on load
+        window.onload = function() {
+            renderNotation('', 300, 120);
+        };
+    </script>
+</body>
+</html>

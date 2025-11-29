@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7A75B3992EDB8713007FF1D1 /* SheetMusicEngraving 2.md in Resources */ = {isa = PBXBuildFile; fileRef = 7A75B3982EDB8713007FF1D1 /* SheetMusicEngraving 2.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		7A75B34C2EDB5442007FF1D1 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		7A75B3372EDB5440007FF1D1 /* maistro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = maistro.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A75B34B2EDB5442007FF1D1 /* maistroTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = maistroTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A75B3552EDB5442007FF1D1 /* maistroUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = maistroUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A75B3982EDB8713007FF1D1 /* SheetMusicEngraving 2.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "SheetMusicEngraving 2.md"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -92,6 +97,7 @@
 				7A75B34E2EDB5442007FF1D1 /* maistroTests */,
 				7A75B3582EDB5442007FF1D1 /* maistroUITests */,
 				7A75B3382EDB5440007FF1D1 /* Products */,
+				7A75B3982EDB8713007FF1D1 /* SheetMusicEngraving 2.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -225,6 +231,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A75B3992EDB8713007FF1D1 /* SheetMusicEngraving 2.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

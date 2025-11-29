@@ -33,7 +33,7 @@ let appCards: [CardData] = [
         title: "Sandbox",
         description: "Experiment with music creation and playback",
         view: .sandbox,
-        disabled: true
+        disabled: false
     ),
     CardData(
         id: "rhythm",

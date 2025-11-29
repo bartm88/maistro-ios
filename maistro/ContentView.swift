@@ -33,7 +33,11 @@ struct ContentView: View {
                 ThemeTesterView()
                     .transition(.move(edge: .trailing))
 
-            case .sandbox, .pitch, .song, .sightread, .improvisation:
+            case .sandbox:
+                SandboxView()
+                    .transition(.move(edge: .trailing))
+
+            case .pitch, .song, .sightread, .improvisation:
                 // Placeholder for future views
                 ComingSoonView(viewName: viewRouter.currentView.rawValue.capitalized)
                     .transition(.move(edge: .trailing))

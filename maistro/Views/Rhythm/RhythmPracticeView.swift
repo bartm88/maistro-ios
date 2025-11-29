@@ -64,29 +64,6 @@ struct RhythmPracticeView: View {
 
                     // Column 2: Controls and Metronome
                     VStack(spacing: 16) {
-//                        // Top row: 3 control buttons
-//                        HStack(spacing: 8) {
-//                            ThemedButton(
-//                                systemName: "arrow.counterclockwise",
-//                                type: .neutral,
-//                                size: .small,
-//                                action: clearAttempt
-//                            )
-//
-//                            ThemedButton(
-//                                systemName: "forward.fill",
-//                                type: .neutral,
-//                                size: .small,
-//                                action: newPassage
-//                            )
-//
-//                            ThemedButton(
-//                                systemName: "gearshape",
-//                                type: .neutral,
-//                                size: .small,
-//                                action: { showSettings = true }
-//                            )
-//                        }
 
                         // Bottom row: Metronome
                         Metronome(
