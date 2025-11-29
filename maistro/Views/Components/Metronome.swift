@@ -163,10 +163,10 @@ struct Metronome: View {
         VStack(spacing: 12) {
             // Metronome visual
             ZStack {
-                // Arc background
+                // Arc background (pie slice)
                 MetronomeArc(angle: metronomeAngle)
-                    .stroke(themeManager.colors.primary, lineWidth: 32)
-                    .frame(width: 100, height: 50)
+                    .fill(themeManager.colors.primary)
+                    .frame(width: 80, height: 70)
 
                 // Pendulum
                 PendulumView(
@@ -179,7 +179,7 @@ struct Metronome: View {
                 Circle()
                     .fill(themeManager.colors.secondary)
                     .frame(width: 12, height: 12)
-                    .offset(y: 25)
+                    .offset(y: 32)
             }
             .frame(height: 80)
             .onTapGesture {
@@ -262,21 +262,22 @@ struct PendulumView: View {
     let duration: Double
     let color: Color
 
-    private let barHeight: CGFloat = 70  // 50 above pivot + 6 below (through circle)
-    private let pivotFromBottom: CGFloat = 6  // Pivot at circle center (radius 6)
+    private let barHeight: CGFloat = 65
 
     var body: some View {
         Rectangle()
             .fill(color)
-            .frame(width: 3, height: barHeight)
-            .offset(y: -pivotFromBottom)
+            .frame(width: 4, height: barHeight)
+            .offset(x: 0, y: 2)
             // Anchor at pivot point (6 from bottom)
             .rotationEffect(
                 .degrees(rotation),
-                anchor: UnitPoint(x: 0.5, y: (barHeight - pivotFromBottom) / barHeight)
+                anchor: UnitPoint(x: 0.5, y: (barHeight) / barHeight)
             )
             .animation(
-                .easeInOut(duration: duration),
+//                .easeInOut(duration: duration),
+//                .default,
+                .linear(duration: duration),
                 value: rotation
             )
     }
@@ -288,11 +289,13 @@ struct MetronomeArc: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.maxY)
-        let radius = min(rect.width, rect.height * 2) / 2
+        let radius: CGFloat = 66
 
         let startAngle = Angle(degrees: -90 - angle / 2)
         let endAngle = Angle(degrees: -90 + angle / 2)
 
+        // Start at center and draw pie slice
+        path.move(to: center)
         path.addArc(
             center: center,
             radius: radius,
@@ -300,6 +303,7 @@ struct MetronomeArc: Shape {
             endAngle: endAngle,
             clockwise: false
         )
+        path.closeSubpath()
 
         return path
     }
