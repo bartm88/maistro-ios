@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		7A75B3A72EDB967C007FF1D1 /* SheetMusicEngraving.md in Resources */ = {isa = PBXBuildFile; fileRef = 7A75B3A62EDB967C007FF1D1 /* SheetMusicEngraving.md */; };
 		7A75B3AB2EDBA62B007FF1D1 /* Claude.md in Resources */ = {isa = PBXBuildFile; fileRef = 7A75B3AA2EDBA625007FF1D1 /* Claude.md */; };
+		7A75B3AE2EDBC0B0007FF1D1 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 7A75B3AD2EDBC0AA007FF1D1 /* README.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +35,7 @@
 		7A75B3552EDB5442007FF1D1 /* maistroUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = maistroUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A75B3A62EDB967C007FF1D1 /* SheetMusicEngraving.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SheetMusicEngraving.md; sourceTree = "<group>"; };
 		7A75B3AA2EDBA625007FF1D1 /* Claude.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Claude.md; sourceTree = "<group>"; };
+		7A75B3AD2EDBC0AA007FF1D1 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -95,6 +97,7 @@
 		7A75B32E2EDB5440007FF1D1 = {
 			isa = PBXGroup;
 			children = (
+				7A75B3AD2EDBC0AA007FF1D1 /* README.md */,
 				7A75B3AA2EDBA625007FF1D1 /* Claude.md */,
 				7A75B3A62EDB967C007FF1D1 /* SheetMusicEngraving.md */,
 				7A75B3392EDB5440007FF1D1 /* maistro */,
@@ -234,6 +237,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7A75B3AE2EDBC0B0007FF1D1 /* README.md in Resources */,
 				7A75B3A72EDB967C007FF1D1 /* SheetMusicEngraving.md in Resources */,
 				7A75B3AB2EDBA62B007FF1D1 /* Claude.md in Resources */,
 			);
