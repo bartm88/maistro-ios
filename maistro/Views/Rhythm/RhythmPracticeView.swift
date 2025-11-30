@@ -13,6 +13,8 @@ struct RhythmPracticeView: View {
     @State private var tempo: Double = 120
     @State private var measureCount: Int = 2
     @State private var timeSignature: String = "4/4"
+    @State private var smallestSubdivision: Int = 8
+    @State private var tempoSubdivision: Int = 4
     @State private var showSettings = false
     @State private var isTapping = false
 
@@ -142,7 +144,9 @@ struct RhythmPracticeView: View {
         .sheet(isPresented: $showSettings) {
             RhythmSettingsSheet(
                 measureCount: $measureCount,
-                timeSignature: $timeSignature
+                timeSignature: $timeSignature,
+                smallestSubdivision: $smallestSubdivision,
+                tempoSubdivision: $tempoSubdivision
             )
         }
         .onAppear {
@@ -152,6 +156,9 @@ struct RhythmPracticeView: View {
             generateNewPassage()
         }
         .onChange(of: timeSignature) { _, _ in
+            generateNewPassage()
+        }
+        .onChange(of: smallestSubdivision) { _, _ in
             generateNewPassage()
         }
     }
@@ -171,7 +178,7 @@ struct RhythmPracticeView: View {
         targetPassage = PassageGenerator.shared.generatePassage(
             measureCount: measureCount,
             timeSignature: parsedTimeSignature,
-            smallestSubdivision: 8
+            smallestSubdivision: smallestSubdivision
         )
     }
 
@@ -233,9 +240,23 @@ struct RhythmSettingsSheet: View {
 
     @Binding var measureCount: Int
     @Binding var timeSignature: String
+    @Binding var smallestSubdivision: Int
+    @Binding var tempoSubdivision: Int
 
     let measureOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9]
     let timeSignatureOptions = ["3/4", "4/4", "5/4", "6/8", "7/8", "9/8", "12/8"]
+    let noteSubdivisionOptions: [(value: Int, label: String)] = [
+        (4, "Quarter Notes"),
+        (8, "Eighth Notes"),
+        (16, "Sixteenth Notes"),
+        (32, "Thirty-Second Notes")
+    ]
+    let tempoSubdivisionOptions: [(value: Int, label: String)] = [
+        (2, "Half Notes"),
+        (4, "Quarter Notes"),
+        (8, "Eighth Notes"),
+        (16, "Sixteenth Notes")
+    ]
 
     var body: some View {
         NavigationView {
@@ -250,6 +271,18 @@ struct RhythmSettingsSheet: View {
                     Picker("Time Signature", selection: $timeSignature) {
                         ForEach(timeSignatureOptions, id: \.self) { sig in
                             Text(sig).tag(sig)
+                        }
+                    }
+
+                    Picker("Note Subdivision", selection: $smallestSubdivision) {
+                        ForEach(noteSubdivisionOptions, id: \.value) { option in
+                            Text(option.label).tag(option.value)
+                        }
+                    }
+
+                    Picker("Tempo Subdivision", selection: $tempoSubdivision) {
+                        ForEach(tempoSubdivisionOptions, id: \.value) { option in
+                            Text(option.label).tag(option.value)
                         }
                     }
                 }

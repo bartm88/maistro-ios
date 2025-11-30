@@ -38,7 +38,7 @@ class PassageGenerator {
         timeSignature: TimeSignature,
         smallestSubdivision: Int
     ) -> DiscreteMeasure {
-        let subdivisionsInMeasure = timeSignature.subdivisionsPerMeasure
+        let subdivisionsInMeasure = timeSignature.subdivisionsPerMeasure(smallestSubdivision: smallestSubdivision)
         var elements: [DiscreteMeasureElement] = []
         var allocatedSubdivisions = 0
 
@@ -59,7 +59,8 @@ class PassageGenerator {
             if shouldRest {
                 let restDurations = convertSubdivisionsToNoteDurations(
                     subdivisions: roll,
-                    startSubdivision: allocatedSubdivisions
+                    startSubdivision: allocatedSubdivisions,
+                    smallestSubdivision: smallestSubdivision
                 )
                 let rest = DiscreteRest(restDurations: restDurations)
                 elements.append(DiscreteMeasureElement(
@@ -69,7 +70,8 @@ class PassageGenerator {
             } else {
                 let noteDurations = convertSubdivisionsToNoteDurations(
                     subdivisions: roll,
-                    startSubdivision: allocatedSubdivisions
+                    startSubdivision: allocatedSubdivisions,
+                    smallestSubdivision: smallestSubdivision
                 )
                 // Use a fixed pitch for rhythm practice (B4 is on the middle line)
                 let note = DiscreteNote(noteName: "B4", noteDurations: noteDurations)
@@ -89,104 +91,98 @@ class PassageGenerator {
     }
 
     /// Convert a number of subdivisions into note/rest durations
-    /// This handles proper rhythmic notation (e.g., 3 eighths becomes dotted quarter)
+    /// This handles proper rhythmic notation using a greedy algorithm that finds
+    /// the largest note value that fits at each position.
+    /// - Parameters:
+    ///   - subdivisions: Number of subdivisions to convert
+    ///   - startSubdivision: The starting position within the measure
+    ///   - smallestSubdivision: The resolution (e.g., 8 for eighths, 16 for sixteenths, 32 for thirty-seconds)
     private func convertSubdivisionsToNoteDurations(
         subdivisions: Int,
-        startSubdivision: Int
+        startSubdivision: Int,
+        smallestSubdivision: Int
     ) -> [DenominatorDots] {
-        // This is a simplified version - for complex rhythms, you'd need more logic
-        // to handle tied notes across beat boundaries
+        var result: [DenominatorDots] = []
+        var remaining = subdivisions
+        var currentPosition = startSubdivision
 
-        switch subdivisions {
-        case 1:
-            return [DenominatorDots(denominator: 8, dots: 0)]
-        case 2:
-            if startSubdivision % 2 == 0 {
-                return [DenominatorDots(denominator: 4, dots: 0)]
-            } else {
-                return [
-                    DenominatorDots(denominator: 8, dots: 0),
-                    DenominatorDots(denominator: 8, dots: 0)
-                ]
-            }
-        case 3:
-            if startSubdivision % 2 == 0 {
-                return [DenominatorDots(denominator: 4, dots: 1)]
-            } else {
-                return [
-                    DenominatorDots(denominator: 8, dots: 0),
-                    DenominatorDots(denominator: 4, dots: 0)
-                ]
-            }
-        case 4:
-            if startSubdivision % 4 == 0 {
-                return [DenominatorDots(denominator: 2, dots: 0)]
-            } else if startSubdivision % 4 == 2 {
-                return [
-                    DenominatorDots(denominator: 4, dots: 0),
-                    DenominatorDots(denominator: 4, dots: 0)
-                ]
-            } else {
-                return [
-                    DenominatorDots(denominator: 8, dots: 0),
-                    DenominatorDots(denominator: 4, dots: 1)
-                ]
-            }
-        case 5:
-            if startSubdivision % 2 == 0 {
-                return [
-                    DenominatorDots(denominator: 2, dots: 0),
-                    DenominatorDots(denominator: 8, dots: 0)
-                ]
-            } else {
-                return [
-                    DenominatorDots(denominator: 8, dots: 0),
-                    DenominatorDots(denominator: 2, dots: 0)
-                ]
-            }
-        case 6:
-            if startSubdivision == 0 {
-                return [
-                    DenominatorDots(denominator: 2, dots: 1)
-                ]
-            } else if startSubdivision == 2 {
-                return [
-                    DenominatorDots(denominator: 4, dots: 0),
-                    DenominatorDots(denominator: 2, dots: 0)
-                ]
-            } else {
-                return [
-                    DenominatorDots(denominator: 8, dots: 0),
-                    DenominatorDots(denominator: 2, dots: 0),
-                    DenominatorDots(denominator: 8, dots: 0)
-                ]
-            }
-        case 7:
-            if startSubdivision == 0 {
-                return [DenominatorDots(denominator: 2, dots: 2)]
-            } else {
-                return [
-                    DenominatorDots(denominator: 8, dots: 0),
-                    DenominatorDots(denominator: 2, dots: 1)
-                ]
-            }
-        case 8:
-            return [DenominatorDots(denominator: 1, dots: 0)]
-        default:
-            // Fallback for larger values - just use whole notes and quarters
-            var result: [DenominatorDots] = []
-            var remaining = subdivisions
-            while remaining >= 8 {
-                result.append(DenominatorDots(denominator: 1, dots: 0))
-                remaining -= 8
-            }
-            if remaining > 0 {
-                result.append(contentsOf: convertSubdivisionsToNoteDurations(
-                    subdivisions: remaining,
-                    startSubdivision: startSubdivision
-                ))
-            }
-            return result
+        while remaining > 0 {
+            let (duration, subdivisionCount) = findLargestFittingDuration(
+                remaining: remaining,
+                position: currentPosition,
+                smallestSubdivision: smallestSubdivision
+            )
+            result.append(duration)
+            remaining -= subdivisionCount
+            currentPosition += subdivisionCount
         }
+
+        return result
+    }
+
+    /// Find the largest note duration that fits at the given position
+    /// Returns the duration and how many subdivisions it consumes
+    private func findLargestFittingDuration(
+        remaining: Int,
+        position: Int,
+        smallestSubdivision: Int
+    ) -> (DenominatorDots, Int) {
+        // Build note values dynamically, filtering out those that can't be represented
+        // at the current resolution.
+        //
+        // For dots to be valid:
+        // - Single dot adds 1/2 of base duration, so base must be >= 2 subdivisions
+        // - Double dot adds 1/2 + 1/4 of base, so base must be >= 4 subdivisions
+        //
+        // Base subdivisions for a note = smallestSubdivision / denominator
+
+        var noteValues: [(subdivisions: Int, denominator: Int, dots: Int, alignment: Int)] = []
+
+        // Denominators from largest note to smallest
+        let denominators = [1, 2, 4, 8, 16, 32]
+
+        for denom in denominators {
+            let baseSubdivisions = smallestSubdivision / denom
+            guard baseSubdivisions >= 1 else { continue }
+
+            let alignment = baseSubdivisions
+
+            // Double-dotted: requires base >= 4 subdivisions (so 1/4 of base >= 1)
+            if baseSubdivisions >= 4 {
+                let doubleDottedSubdivisions = baseSubdivisions + baseSubdivisions / 2 + baseSubdivisions / 4
+                noteValues.append((doubleDottedSubdivisions, denom, 2, alignment))
+            }
+
+            // Single-dotted: requires base >= 2 subdivisions (so 1/2 of base >= 1)
+            if baseSubdivisions >= 2 {
+                let dottedSubdivisions = baseSubdivisions + baseSubdivisions / 2
+                noteValues.append((dottedSubdivisions, denom, 1, alignment))
+            }
+
+            // Undotted: always valid if base >= 1
+            noteValues.append((baseSubdivisions, denom, 0, alignment))
+        }
+
+        // Sort by subdivisions descending (largest first)
+        noteValues.sort { $0.subdivisions > $1.subdivisions }
+
+        for noteValue in noteValues {
+            let subdivisionCount = noteValue.subdivisions
+            let alignment = noteValue.alignment
+
+            // Check if this note fits and is properly aligned
+            if subdivisionCount <= remaining && position % alignment == 0 {
+                return (
+                    DenominatorDots(denominator: noteValue.denominator, dots: noteValue.dots),
+                    subdivisionCount
+                )
+            }
+        }
+
+        // Fallback: use the smallest subdivision unit
+        return (
+            DenominatorDots(denominator: smallestSubdivision, dots: 0),
+            1
+        )
     }
 }

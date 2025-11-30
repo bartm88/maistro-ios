@@ -32,11 +32,12 @@ struct TimeSignature: Codable, Equatable {
         "\(numerator)/\(denominator)"
     }
 
-    /// Number of eighth-note subdivisions in one measure
-    var subdivisionsPerMeasure: Int {
-        // Convert to eighth note subdivisions
-        // e.g., 4/4 = 8 eighths, 3/4 = 6 eighths, 6/8 = 6 eighths
-        return numerator * 8 / denominator
+    /// Number of subdivisions in one measure at the given resolution
+    /// - Parameter smallestSubdivision: The smallest note value (e.g., 8 for eighths, 16 for sixteenths)
+    func subdivisionsPerMeasure(smallestSubdivision: Int) -> Int {
+        // e.g., 4/4 with subdivision=8 -> 8 eighths
+        // e.g., 4/4 with subdivision=16 -> 16 sixteenths
+        return numerator * smallestSubdivision / denominator
     }
 }
 
@@ -46,8 +47,8 @@ struct DenominatorDots: Codable, Equatable {
     let denominator: Int  // 1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth
     let dots: Int
 
-    /// Duration in eighth-note subdivisions (assuming subdivision resolution of 8)
-    func subdivisionDuration(resolution: Int = 8) -> Int {
+    /// Duration in subdivisions based on resolution
+    func subdivisionDuration(resolution: Int) -> Int {
         let baseDuration = resolution / denominator
         switch dots {
         case 0: return baseDuration
@@ -70,7 +71,7 @@ struct DiscreteNote: Codable, Equatable {
     let noteDurations: [DenominatorDots]
 
     /// Total duration in subdivisions
-    func totalSubdivisionDuration(resolution: Int = 8) -> Int {
+    func totalSubdivisionDuration(resolution: Int) -> Int {
         noteDurations.reduce(0) { $0 + $1.subdivisionDuration(resolution: resolution) }
     }
 }
@@ -79,7 +80,7 @@ struct DiscreteRest: Codable, Equatable {
     let restDurations: [DenominatorDots]
 
     /// Total duration in subdivisions
-    func totalSubdivisionDuration(resolution: Int = 8) -> Int {
+    func totalSubdivisionDuration(resolution: Int) -> Int {
         restDurations.reduce(0) { $0 + $1.subdivisionDuration(resolution: resolution) }
     }
 }

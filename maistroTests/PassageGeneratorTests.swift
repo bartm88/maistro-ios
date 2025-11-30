@@ -51,9 +51,9 @@ struct PassageGeneratorTests {
                 let totalDuration = measure.elements.reduce(0) { total, element in
                     switch element.element {
                     case .note(let note):
-                        return total + note.totalSubdivisionDuration()
+                        return total + note.totalSubdivisionDuration(resolution: 8)
                     case .rest(let rest):
-                        return total + rest.totalSubdivisionDuration()
+                        return total + rest.totalSubdivisionDuration(resolution: 8)
                     }
                 }
                 #expect(totalDuration == expectedSubdivisions,
@@ -166,9 +166,9 @@ struct PassageGeneratorTests {
                 let duration: Int
                 switch element.element {
                 case .note(let note):
-                    duration = note.totalSubdivisionDuration()
+                    duration = note.totalSubdivisionDuration(resolution: 8)
                 case .rest(let rest):
-                    duration = rest.totalSubdivisionDuration()
+                    duration = rest.totalSubdivisionDuration(resolution: 8)
                 }
                 expectedStart += duration
             }
@@ -208,6 +208,168 @@ struct PassageGeneratorTests {
             }
         }
     }
+
+    // MARK: - 32nd Note Subdivision Tests
+
+    @Test func thirtySecondNoteSubdivisionsPerMeasure() {
+        // 4/4 with 32nd notes = 32 subdivisions per measure
+        #expect(TimeSignature(4, 4).subdivisionsPerMeasure(smallestSubdivision: 32) == 32)
+        // 5/4 with 32nd notes = 40 subdivisions per measure
+        #expect(TimeSignature(5, 4).subdivisionsPerMeasure(smallestSubdivision: 32) == 40)
+        // 3/4 with 32nd notes = 24 subdivisions per measure
+        #expect(TimeSignature(3, 4).subdivisionsPerMeasure(smallestSubdivision: 32) == 24)
+    }
+
+    @Test func thirtySecondNoteMeasuresHaveCorrectTotalDuration() {
+        let timeSignature = TimeSignature(4, 4)
+        let smallestSubdivision = 32
+        let expectedSubdivisions = 32  // 4/4 = 32 thirty-second notes
+
+        // Run many times since generation is random
+        for iteration in 0..<50 {
+            let passage = generator.generatePassage(
+                measureCount: 2,
+                timeSignature: timeSignature,
+                smallestSubdivision: smallestSubdivision
+            )
+
+            for (measureIndex, measure) in passage.measures.enumerated() {
+                let totalDuration = measure.elements.reduce(0) { total, element in
+                    switch element.element {
+                    case .note(let note):
+                        return total + note.totalSubdivisionDuration(resolution: smallestSubdivision)
+                    case .rest(let rest):
+                        return total + rest.totalSubdivisionDuration(resolution: smallestSubdivision)
+                    }
+                }
+                #expect(totalDuration == expectedSubdivisions,
+                       "Iteration \(iteration), Measure \(measureIndex): duration \(totalDuration) != expected \(expectedSubdivisions)")
+            }
+        }
+    }
+
+    @Test func thirtySecondNoteValidDenominators() {
+        let passage = generator.generatePassage(
+            measureCount: 2,
+            timeSignature: TimeSignature(4, 4),
+            smallestSubdivision: 32
+        )
+
+        let validDenominators = [1, 2, 4, 8, 16, 32]
+
+        for measure in passage.measures {
+            for element in measure.elements {
+                let durations: [DenominatorDots]
+                switch element.element {
+                case .note(let note):
+                    durations = note.noteDurations
+                case .rest(let rest):
+                    durations = rest.restDurations
+                }
+
+                for duration in durations {
+                    #expect(validDenominators.contains(duration.denominator),
+                           "Invalid denominator for 32nd subdivision: \(duration.denominator)")
+                }
+            }
+        }
+    }
+
+    @Test func thirtySecondNoteElementStartSubdivisionsAreContiguous() {
+        for _ in 0..<20 {
+            let passage = generator.generatePassage(
+                measureCount: 2,
+                timeSignature: TimeSignature(4, 4),
+                smallestSubdivision: 32
+            )
+
+            for measure in passage.measures {
+                var expectedStart = 0
+                for element in measure.elements {
+                    #expect(element.startSubdivision == expectedStart,
+                           "Element should start at \(expectedStart), but starts at \(element.startSubdivision)")
+
+                    let duration: Int
+                    switch element.element {
+                    case .note(let note):
+                        duration = note.totalSubdivisionDuration(resolution: 32)
+                    case .rest(let rest):
+                        duration = rest.totalSubdivisionDuration(resolution: 32)
+                    }
+                    expectedStart += duration
+                }
+            }
+        }
+    }
+
+    @Test func fiveFourWithThirtySecondNotes() {
+        let timeSignature = TimeSignature(5, 4)
+        let smallestSubdivision = 32
+        let expectedSubdivisions = 40  // 5/4 = 40 thirty-second notes
+
+        for iteration in 0..<20 {
+            let passage = generator.generatePassage(
+                measureCount: 2,
+                timeSignature: timeSignature,
+                smallestSubdivision: smallestSubdivision
+            )
+
+            for (measureIndex, measure) in passage.measures.enumerated() {
+                let totalDuration = measure.elements.reduce(0) { total, element in
+                    switch element.element {
+                    case .note(let note):
+                        return total + note.totalSubdivisionDuration(resolution: smallestSubdivision)
+                    case .rest(let rest):
+                        return total + rest.totalSubdivisionDuration(resolution: smallestSubdivision)
+                    }
+                }
+                #expect(totalDuration == expectedSubdivisions,
+                       "Iteration \(iteration), Measure \(measureIndex): duration \(totalDuration) != expected \(expectedSubdivisions) for 5/4")
+            }
+        }
+    }
+
+    @Test func dotsAreOnlyUsedWhenRepresentable() {
+        // At 32nd note resolution:
+        // - 32nd notes (denom=32): base=1 subdivision, NO dots allowed
+        // - 16th notes (denom=16): base=2 subdivisions, single dot OK (adds 1), NO double dot
+        // - 8th notes (denom=8): base=4 subdivisions, single dot OK, double dot OK
+        // - etc.
+
+        for _ in 0..<50 {
+            let passage = generator.generatePassage(
+                measureCount: 2,
+                timeSignature: TimeSignature(4, 4),
+                smallestSubdivision: 32
+            )
+
+            for measure in passage.measures {
+                for element in measure.elements {
+                    let durations: [DenominatorDots]
+                    switch element.element {
+                    case .note(let note):
+                        durations = note.noteDurations
+                    case .rest(let rest):
+                        durations = rest.restDurations
+                    }
+
+                    for duration in durations {
+                        let baseSubdivisions = 32 / duration.denominator
+
+                        if duration.dots == 1 {
+                            // Single dot requires base >= 2
+                            #expect(baseSubdivisions >= 2,
+                                   "Single dot on denominator \(duration.denominator) invalid: base subdivisions = \(baseSubdivisions)")
+                        } else if duration.dots == 2 {
+                            // Double dot requires base >= 4
+                            #expect(baseSubdivisions >= 4,
+                                   "Double dot on denominator \(duration.denominator) invalid: base subdivisions = \(baseSubdivisions)")
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // MARK: - DenominatorDots Tests
@@ -216,27 +378,27 @@ struct DenominatorDotsTests {
 
     @Test func subdivisionDurationCalculation() {
         // Whole note = 8 subdivisions
-        #expect(DenominatorDots(denominator: 1, dots: 0).subdivisionDuration() == 8)
+        #expect(DenominatorDots(denominator: 1, dots: 0).subdivisionDuration(resolution: 8) == 8)
 
         // Half note = 4 subdivisions
-        #expect(DenominatorDots(denominator: 2, dots: 0).subdivisionDuration() == 4)
+        #expect(DenominatorDots(denominator: 2, dots: 0).subdivisionDuration(resolution: 8) == 4)
 
         // Quarter note = 2 subdivisions
-        #expect(DenominatorDots(denominator: 4, dots: 0).subdivisionDuration() == 2)
+        #expect(DenominatorDots(denominator: 4, dots: 0).subdivisionDuration(resolution: 8) == 2)
 
         // Eighth note = 1 subdivision
-        #expect(DenominatorDots(denominator: 8, dots: 0).subdivisionDuration() == 1)
+        #expect(DenominatorDots(denominator: 8, dots: 0).subdivisionDuration(resolution: 8) == 1)
     }
 
     @Test func dottedNoteDurations() {
         // Dotted half = 6 subdivisions (4 + 2)
-        #expect(DenominatorDots(denominator: 2, dots: 1).subdivisionDuration() == 6)
+        #expect(DenominatorDots(denominator: 2, dots: 1).subdivisionDuration(resolution: 8) == 6)
 
         // Dotted quarter = 3 subdivisions (2 + 1)
-        #expect(DenominatorDots(denominator: 4, dots: 1).subdivisionDuration() == 3)
+        #expect(DenominatorDots(denominator: 4, dots: 1).subdivisionDuration(resolution: 8) == 3)
 
         // Double-dotted half = 7 subdivisions (4 + 2 + 1)
-        #expect(DenominatorDots(denominator: 2, dots: 2).subdivisionDuration() == 7)
+        #expect(DenominatorDots(denominator: 2, dots: 2).subdivisionDuration(resolution: 8) == 7)
     }
 
     @Test func vexFlowDurationString() {
@@ -251,12 +413,21 @@ struct DenominatorDotsTests {
 struct TimeSignatureTests {
 
     @Test func subdivisionsPerMeasure() {
-        #expect(TimeSignature(4, 4).subdivisionsPerMeasure == 8)
-        #expect(TimeSignature(3, 4).subdivisionsPerMeasure == 6)
-        #expect(TimeSignature(6, 8).subdivisionsPerMeasure == 6)
-        #expect(TimeSignature(2, 4).subdivisionsPerMeasure == 4)
-        #expect(TimeSignature(2, 2).subdivisionsPerMeasure == 8)
-        #expect(TimeSignature(5, 4).subdivisionsPerMeasure == 10)
+        // With eighth note resolution (8)
+        #expect(TimeSignature(4, 4).subdivisionsPerMeasure(smallestSubdivision: 8) == 8)
+        #expect(TimeSignature(3, 4).subdivisionsPerMeasure(smallestSubdivision: 8) == 6)
+        #expect(TimeSignature(6, 8).subdivisionsPerMeasure(smallestSubdivision: 8) == 6)
+        #expect(TimeSignature(2, 4).subdivisionsPerMeasure(smallestSubdivision: 8) == 4)
+        #expect(TimeSignature(2, 2).subdivisionsPerMeasure(smallestSubdivision: 8) == 8)
+        #expect(TimeSignature(5, 4).subdivisionsPerMeasure(smallestSubdivision: 8) == 10)
+
+        // With sixteenth note resolution (16)
+        #expect(TimeSignature(4, 4).subdivisionsPerMeasure(smallestSubdivision: 16) == 16)
+        #expect(TimeSignature(3, 4).subdivisionsPerMeasure(smallestSubdivision: 16) == 12)
+
+        // With quarter note resolution (4)
+        #expect(TimeSignature(4, 4).subdivisionsPerMeasure(smallestSubdivision: 4) == 4)
+        #expect(TimeSignature(3, 4).subdivisionsPerMeasure(smallestSubdivision: 4) == 3)
     }
 
     @Test func displayString() {
@@ -288,7 +459,7 @@ struct DiscreteNoteTests {
             noteName: "B4",
             noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
         )
-        #expect(singleNote.totalSubdivisionDuration() == 2)
+        #expect(singleNote.totalSubdivisionDuration(resolution: 8) == 2)
 
         // Two eighths = 2 subdivisions
         let twoEighths = DiscreteNote(
@@ -298,7 +469,7 @@ struct DiscreteNoteTests {
                 DenominatorDots(denominator: 8, dots: 0)
             ]
         )
-        #expect(twoEighths.totalSubdivisionDuration() == 2)
+        #expect(twoEighths.totalSubdivisionDuration(resolution: 8) == 2)
     }
 }
 

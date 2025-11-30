@@ -12,7 +12,7 @@ struct SheetMusicWebView: UIViewRepresentable {
     let height: CGFloat
     let timeSignature: String
 
-    init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String = "4/4") {
+    init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String) {
         self.notation = notation
         self.width = width
         self.height = height
@@ -184,9 +184,10 @@ struct SheetMusicView: View {
     }
 
     /// Initialize with a DiscretePassage (calculates dimensions automatically)
-    init(passage: DiscretePassage, label: String? = nil, timeSignature: String = "4/4") {
+    init(passage: DiscretePassage, label: String?, timeSignature: String) {
         // Convert passage to JSON string for JavaScript
         // Note: Do NOT use convertToSnakeCase - the JS expects camelCase (noteDurations, noteName, etc.)
+        print(passage)
         let encoder = JSONEncoder()
         if let jsonData = try? encoder.encode(passage),
            let jsonString = String(data: jsonData, encoding: .utf8) {
@@ -194,6 +195,8 @@ struct SheetMusicView: View {
         } else {
             self.notation = ""
         }
+        print(self.notation)
+        print("===============")
         self.label = label
         self.timeSignature = timeSignature
 
@@ -373,7 +376,8 @@ struct NotePreview: View {
 
         SheetMusicView(
             passage: DiscretePassage.samplePassage,
-            label: "Sample"
+            label: "Sample",
+            timeSignature: "4/4"
         )
         .environmentObject(ThemeManager.shared)
     }
