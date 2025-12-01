@@ -239,7 +239,8 @@ struct Metronome: View {
                 }
             )
         }
-        .padding(8)
+        .padding([.horizontal], 24)
+        .padding([.vertical], 8)
         .background(themeManager.colors.neutral)
         .cornerRadius(16)
         .overlay(

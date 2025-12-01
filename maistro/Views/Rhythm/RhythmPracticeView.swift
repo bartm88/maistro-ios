@@ -47,6 +47,22 @@ struct RhythmPracticeView: View {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(spacing: 8) {
                         
+
+                        // Column 1: Evaluation chart
+                        RadarChartView(
+                            dataPoints: [
+                                RadarChartDataPoint(id: "duration", label: "Duration", score: durationScore),
+                                RadarChartDataPoint(id: "rhythm", label: "Rhythm", score: rhythmScore),
+                                RadarChartDataPoint(id: "pitch", label: "Pitch", score: pitchScore)
+                            ],
+                            size: 250,
+                            labelPadding: 25,
+                            onAxisTapped: nil
+                        )
+                    }
+
+                    // Column 2: Controls and Metronome
+                    VStack(spacing: 16) {
                         // Top row: 3 control buttons
                         HStack(spacing: 8) {
                             ThemedButton(
@@ -70,19 +86,6 @@ struct RhythmPracticeView: View {
                                 action: { showSettings = true }
                             )
                         }
-                        // Column 1: Evaluation chart
-                        EvaluationChartView(
-                            durationScore: durationScore,
-                            rhythmScore: rhythmScore,
-                            pitchScore: pitchScore,
-                            width: 230,
-                            height: 153
-                        )
-                    }
-
-                    // Column 2: Controls and Metronome
-                    VStack(spacing: 16) {
-
                         // Bottom row: Metronome
                         Metronome(
                             initialTempo: tempo,
