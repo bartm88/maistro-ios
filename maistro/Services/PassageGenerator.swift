@@ -65,7 +65,8 @@ class PassageGenerator {
                 let rest = DiscreteRest(restDurations: restDurations)
                 elements.append(DiscreteMeasureElement(
                     element: .rest(rest),
-                    startSubdivision: allocatedSubdivisions
+                    startSubdivision: allocatedSubdivisions,
+                    tiedFromPrevious: false
                 ))
             } else {
                 let noteDurations = convertSubdivisionsToNoteDurations(
@@ -77,7 +78,8 @@ class PassageGenerator {
                 let note = DiscreteNote(noteName: "B4", noteDurations: noteDurations)
                 elements.append(DiscreteMeasureElement(
                     element: .note(note),
-                    startSubdivision: allocatedSubdivisions
+                    startSubdivision: allocatedSubdivisions,
+                    tiedFromPrevious: false
                 ))
             }
 

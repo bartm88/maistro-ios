@@ -101,35 +101,64 @@
             const score = factory.EasyScore();
             score.set({ time: timeSignature });
 
+            // Track last note of each measure for cross-measure ties
+            let lastNoteOfPreviousMeasure = null;
+            // Track pending cross-measure ties (from last note of prev measure to first note of current)
+            const crossMeasureTies = [];
+
             measures.forEach((measure, measureIndex) => {
                 const voiceNotes = [];
                 let tieStartNote = null;
+                let firstNoteOfMeasure = null;
+                let lastNoteOfMeasure = null;
 
                 measure.elements.forEach((element) => {
                     if (element.element.Note) {
                         const note = element.element.Note;
+                        const isTiedFromPrevious = element.tiedFromPrevious === true;
+
                         note.noteDurations.forEach((duration, durationIndex) => {
                             const noteStr = `${note.noteName}/${duration.denominator}${'.'.repeat(duration.dots)}`;
                             const staveNotes = score.notes(noteStr);
+                            const currentNote = staveNotes[0];
 
-                            if (durationIndex > 0 && tieStartNote) {
-                                // Need to tie to previous note
-                                factory.StaveTie({ from: tieStartNote, to: staveNotes[0] });
+                            // Track first note of measure for cross-measure ties
+                            if (firstNoteOfMeasure === null) {
+                                firstNoteOfMeasure = currentNote;
+
+                                // If this note is tied from previous measure, record the tie
+                                if (isTiedFromPrevious && lastNoteOfPreviousMeasure) {
+                                    crossMeasureTies.push({
+                                        from: lastNoteOfPreviousMeasure,
+                                        to: currentNote
+                                    });
+                                }
                             }
 
-                            tieStartNote = staveNotes[0];
+                            // Tie within same note element (multiple durations)
+                            if (durationIndex > 0 && tieStartNote) {
+                                factory.StaveTie({ from: tieStartNote, to: currentNote });
+                            }
+
+                            tieStartNote = currentNote;
+                            lastNoteOfMeasure = currentNote;
                             voiceNotes.push(...staveNotes);
                         });
                     } else if (element.element.Rest) {
                         const rest = element.element.Rest;
                         rest.restDurations.forEach((duration) => {
-                            const restStr = `B4/${duration.denominator}${'.'.repeat(duration.dots)}/r`;
+                            // VexFlow EasyScore: dots come AFTER the /r suffix
+                            // e.g., "B4/4/r." for dotted quarter rest
+                            const restStr = `B4/${duration.denominator}/r${'.'.repeat(duration.dots)}`;
                             const staveNotes = score.notes(restStr);
                             voiceNotes.push(...staveNotes);
                         });
                         tieStartNote = null;
                     }
                 });
+
+                // Save last note of this measure for potential cross-measure tie
+                lastNoteOfPreviousMeasure = lastNoteOfMeasure;
 
                 if (voiceNotes.length > 0) {
                     const voice = score.voice(voiceNotes);
@@ -157,6 +186,11 @@
                         system.addStave({ voices: [voice] });
                     }
                 }
+            });
+
+            // Draw cross-measure ties after all measures are set up
+            crossMeasureTies.forEach(tie => {
+                factory.StaveTie({ from: tie.from, to: tie.to });
             });
 
             factory.draw();

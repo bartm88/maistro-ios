@@ -484,7 +484,8 @@ struct VexFlowConversionTests {
         )
         let element = DiscreteMeasureElement(
             element: .note(note),
-            startSubdivision: 0
+            startSubdivision: 0,
+            tiedFromPrevious: false
         )
         let measure = DiscreteMeasure(subdivisionDenominator: 8, elements: [element])
         let passage = DiscretePassage(measures: [measure])
@@ -500,7 +501,8 @@ struct VexFlowConversionTests {
         )
         let element = DiscreteMeasureElement(
             element: .rest(rest),
-            startSubdivision: 0
+            startSubdivision: 0,
+            tiedFromPrevious: false
         )
         let measure = DiscreteMeasure(subdivisionDenominator: 8, elements: [element])
         let passage = DiscretePassage(measures: [measure])

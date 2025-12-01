@@ -397,21 +397,24 @@ extension DiscretePassage {
                         noteName: "B4",
                         noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
                     )),
-                    startSubdivision: 0
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
                 ),
                 DiscreteMeasureElement(
                     element: .note(DiscreteNote(
                         noteName: "B4",
                         noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
                     )),
-                    startSubdivision: 2
+                    startSubdivision: 2,
+                    tiedFromPrevious: false
                 ),
                 DiscreteMeasureElement(
                     element: .note(DiscreteNote(
                         noteName: "B4",
                         noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
                     )),
-                    startSubdivision: 4
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
                 )
             ]
         )
@@ -425,27 +428,31 @@ extension DiscretePassage {
                         noteName: "B4",
                         noteDurations: [DenominatorDots(denominator: 4, dots: 1)]
                     )),
-                    startSubdivision: 0
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
                 ),
                 DiscreteMeasureElement(
                     element: .note(DiscreteNote(
                         noteName: "B4",
                         noteDurations: [DenominatorDots(denominator: 8, dots: 0)]
                     )),
-                    startSubdivision: 3
+                    startSubdivision: 3,
+                    tiedFromPrevious: false
                 ),
                 DiscreteMeasureElement(
                     element: .rest(DiscreteRest(
                         restDurations: [DenominatorDots(denominator: 4, dots: 0)]
                     )),
-                    startSubdivision: 4
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
                 ),
                 DiscreteMeasureElement(
                     element: .note(DiscreteNote(
                         noteName: "B4",
                         noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
                     )),
-                    startSubdivision: 6
+                    startSubdivision: 6,
+                    tiedFromPrevious: false
                 )
             ]
         )

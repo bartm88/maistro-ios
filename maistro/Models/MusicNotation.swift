@@ -121,6 +121,8 @@ enum DiscreteElement: Codable, Equatable {
 struct DiscreteMeasureElement: Codable, Equatable {
     let element: DiscreteElement
     let startSubdivision: Int
+    /// If true, this note is a continuation from the previous measure and should be tied
+    let tiedFromPrevious: Bool
 }
 
 struct DiscreteMeasure: Codable, Equatable {

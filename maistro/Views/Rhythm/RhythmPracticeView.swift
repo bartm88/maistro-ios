@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct RhythmPracticeView: View {
     @EnvironmentObject var themeManager: ThemeManager
@@ -21,7 +22,15 @@ struct RhythmPracticeView: View {
     // Target passage for practice
     @State private var targetPassage: DiscretePassage?
 
-    // Evaluation scores (placeholder for now)
+    // Played passage (converted from raw input)
+    @State private var playedPassage: DiscretePassage?
+    @State private var rawPlayedPassage: RawPassage = RawPassage.empty()
+
+    // Note input listener
+    @State private var noteInputListener: NoteInputListener?
+    @State private var cancellables = Set<AnyCancellable>()
+
+    // Evaluation scores
     @State private var durationScore: Double = 0
     @State private var rhythmScore: Double = 0
     @State private var pitchScore: Double = 0
@@ -102,12 +111,20 @@ struct RhythmPracticeView: View {
                         )
                     }
 
-                    // Played passage (placeholder for now - will show user's tapped rhythm)
-                    SheetMusicView(
-                        notation: "",
-                        label: "Played",
-                        timeSignature: timeSignature
-                    )
+                    // Played passage
+                    if let played = playedPassage {
+                        SheetMusicView(
+                            passage: played,
+                            label: "Played",
+                            timeSignature: timeSignature
+                        )
+                    } else {
+                        SheetMusicView(
+                            notation: "",
+                            label: "Played",
+                            timeSignature: timeSignature
+                        )
+                    }
                 }
                 .padding(.horizontal)
 
@@ -151,6 +168,7 @@ struct RhythmPracticeView: View {
         }
         .onAppear {
             generateNewPassage()
+            setupNoteInputListener()
         }
         .onChange(of: measureCount) { _, _ in
             generateNewPassage()
@@ -167,6 +185,12 @@ struct RhythmPracticeView: View {
         durationScore = 0
         rhythmScore = 0
         pitchScore = 0
+        playedPassage = nil
+        rawPlayedPassage = RawPassage.empty()
+
+        Task {
+            await noteInputListener?.clear()
+        }
     }
 
     private func newPassage() {
@@ -182,16 +206,74 @@ struct RhythmPracticeView: View {
         )
     }
 
+    private func setupNoteInputListener() {
+        let config = NoteInputListenerConfig.rhythmPractice()
+        let listener = NoteInputListener(config: config)
+        noteInputListener = listener
+
+        // Subscribe to passage updates
+        listener.passagePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [self] passage in
+                rawPlayedPassage = passage
+                updatePlayedPassage()
+                evaluatePassage()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func updatePlayedPassage() {
+        let snapperConfig = SnapperConfig(
+            tempo: tempo,
+            tempoSubdivision: tempoSubdivision,
+            subdivisionResolution: smallestSubdivision,
+            timeSignature: parsedTimeSignature
+        )
+        let snapper = SubdivisionSnapper(config: snapperConfig)
+        let converter = RawToDiscreteConverter(snapper: snapper)
+
+        playedPassage = converter.convert(
+            rawPassage: rawPlayedPassage,
+            measureCount: measureCount,
+            noteName: "B4"
+        )
+    }
+
+    private func evaluatePassage() {
+        guard let target = targetPassage else { return }
+
+        let context = EvaluationContext(
+            tempo: tempo,
+            tempoSubdivision: tempoSubdivision,
+            subdivisionResolution: smallestSubdivision
+        )
+
+        let evaluator = PassageEvaluator(context: context)
+        let result = evaluator.evaluate(
+            expected: target,
+            actual: rawPlayedPassage,
+            timeSignature: parsedTimeSignature
+        )
+
+        rhythmScore = result.rhythmScore
+        // Duration and pitch scores would come from additional evaluators
+        // For now, set placeholder values based on rhythm score
+        durationScore = rhythmScore * 0.9 + 0.1
+        pitchScore = 1.0 // Pitch is always correct for tap input
+    }
+
     private func sendTapDown() {
-        // Send tap down to backend
+        let timestampMs = NoteInputListener.currentTimestampMs()
+        Task {
+            await noteInputListener?.noteStarted(timestampMs: timestampMs)
+        }
     }
 
     private func sendTapUp() {
-        // Send tap up to backend and get evaluation
-        // For demo, set random scores
-        durationScore = Double.random(in: 0.5...1.0)
-        rhythmScore = Double.random(in: 0.5...1.0)
-        pitchScore = Double.random(in: 0.5...1.0)
+        let timestampMs = NoteInputListener.currentTimestampMs()
+        Task {
+            await noteInputListener?.noteEnded(timestampMs: timestampMs)
+        }
     }
 }
 
