@@ -130,19 +130,14 @@ struct RhythmPracticeView: View {
                     }
 
                     // Played passage
-                    if let played = playedPassage {
-                        SheetMusicView(
-                            passage: played,
-                            label: "Played",
-                            timeSignature: timeSignature
-                        )
-                    } else {
-                        SheetMusicView(
-                            notation: "",
-                            label: "Played",
-                            timeSignature: timeSignature
-                        )
-                    }
+                    SheetMusicView(
+                        passage: playedPassage ?? DiscretePassage.blank(
+                            measureCount: measureCount,
+                            subdivisionDenominator: smallestSubdivision
+                        ),
+                        label: "Played",
+                        timeSignature: timeSignature
+                    )
                 }
                 .padding(.horizontal)
 
@@ -189,13 +184,13 @@ struct RhythmPracticeView: View {
             setupNoteInputListener()
         }
         .onChange(of: measureCount) { _, _ in
-            generateNewPassage()
+            newPassage()
         }
         .onChange(of: timeSignature) { _, _ in
-            generateNewPassage()
+            newPassage()
         }
         .onChange(of: smallestSubdivision) { _, _ in
-            generateNewPassage()
+            newPassage()
         }
     }
 

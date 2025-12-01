@@ -160,31 +160,30 @@
                 // Save last note of this measure for potential cross-measure tie
                 lastNoteOfPreviousMeasure = lastNoteOfMeasure;
 
-                if (voiceNotes.length > 0) {
-                    const voice = score.voice(voiceNotes);
-                    const lineIndex = Math.floor(measureIndex / measuresPerLine);
-                    const positionInLine = measureIndex % measuresPerLine;
-                    const y = MEASURE_Y_OFFSET + MEASURE_HEIGHT * lineIndex;
+                const lineIndex = Math.floor(measureIndex / measuresPerLine);
+                const positionInLine = measureIndex % measuresPerLine;
+                const y = MEASURE_Y_OFFSET + MEASURE_HEIGHT * lineIndex;
 
-                    // First measure of each line gets clef (and time signature on very first measure)
-                    if (positionInLine === 0) {
-                        const system = factory.System({
-                            width: FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth,
-                            x: 10,
-                            y: y
-                        });
-                        const stave = system.addStave({ voices: [voice] }).addClef('treble');
-                        if (measureIndex === 0) {
-                            stave.addTimeSignature(timeSignature);
-                        }
-                    } else {
-                        const system = factory.System({
-                            width: measureWidth,
-                            x: 10 + FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth * positionInLine,
-                            y: y
-                        });
-                        system.addStave({ voices: [voice] });
+                // First measure of each line gets clef (and time signature on very first measure)
+                if (positionInLine === 0) {
+                    const system = factory.System({
+                        width: FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth,
+                        x: 10,
+                        y: y
+                    });
+                    const voices = voiceNotes.length > 0 ? [score.voice(voiceNotes)] : [];
+                    const stave = system.addStave({ voices: voices }).addClef('treble');
+                    if (measureIndex === 0) {
+                        stave.addTimeSignature(timeSignature);
                     }
+                } else {
+                    const system = factory.System({
+                        width: measureWidth,
+                        x: 10 + FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth * positionInLine,
+                        y: y
+                    });
+                    const voices = voiceNotes.length > 0 ? [score.voice(voiceNotes)] : [];
+                    system.addStave({ voices: voices });
                 }
             });
 

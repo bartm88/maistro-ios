@@ -174,6 +174,19 @@ struct DiscreteMeasure: Codable, Equatable {
 
 struct DiscretePassage: Codable, Equatable {
     let measures: [DiscreteMeasure]
+
+    /// Creates a blank passage with whole rests in each measure
+    static func blank(measureCount: Int, subdivisionDenominator: Int) -> DiscretePassage {
+        let wholeRest = DiscreteMeasureElement(
+            element: .rest(DiscreteRest(restDurations: [DenominatorDots(denominator: 1, dots: 0)])),
+            startSubdivision: 0,
+            tiedFromPrevious: false
+        )
+        let restMeasures = (0..<measureCount).map { _ in
+            DiscreteMeasure(subdivisionDenominator: subdivisionDenominator, elements: [wholeRest])
+        }
+        return DiscretePassage(measures: restMeasures)
+    }
 }
 
 // MARK: - VexFlow Conversion
