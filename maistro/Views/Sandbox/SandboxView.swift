@@ -33,8 +33,10 @@ struct SandboxView: View {
 
                     SheetMusicView(
                         notation: notation,
+                        label: nil,
                         width: 340,
-                        height: 120
+                        height: 120,
+                        timeSignature: "4/4"
                     )
                 }
                 .padding(.horizontal)

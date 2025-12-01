@@ -11,16 +11,18 @@ struct SheetMusicWebView: UIViewRepresentable {
     let width: CGFloat
     let height: CGFloat
     let timeSignature: String
+    let scalingFactor: CGFloat
 
-    init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String) {
+    init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String, scalingFactor: CGFloat) {
         self.notation = notation
         self.width = width
         self.height = height
         self.timeSignature = timeSignature
+        self.scalingFactor = scalingFactor
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(notation: notation, width: width, height: height, timeSignature: timeSignature)
+        Coordinator(notation: notation, width: width, height: height, timeSignature: timeSignature, scalingFactor: scalingFactor)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -44,6 +46,7 @@ struct SheetMusicWebView: UIViewRepresentable {
         context.coordinator.width = width
         context.coordinator.height = height
         context.coordinator.timeSignature = timeSignature
+        context.coordinator.scalingFactor = scalingFactor
 
         if context.coordinator.isLoaded {
             context.coordinator.renderNotation(webView: webView)
@@ -55,13 +58,15 @@ struct SheetMusicWebView: UIViewRepresentable {
         var width: CGFloat
         var height: CGFloat
         var timeSignature: String
+        var scalingFactor: CGFloat
         var isLoaded = false
 
-        init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String) {
+        init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String, scalingFactor: CGFloat) {
             self.notation = notation
             self.width = width
             self.height = height
             self.timeSignature = timeSignature
+            self.scalingFactor = scalingFactor
         }
 
         func loadVexFlowHTML(webView: WKWebView) {
@@ -146,8 +151,8 @@ struct SheetMusicWebView: UIViewRepresentable {
                 .replacingOccurrences(of: "\"", with: "\\\"")
                 .replacingOccurrences(of: "\n", with: "\\n")
 
-            let js = "renderNotation(\"\(escapedNotation)\", \(width), \(height), \"\(timeSignature)\");"
-            print("[VexFlow] Executing JS: \(js.prefix(120))...")
+            let js = "renderNotation(\"\(escapedNotation)\", \(width), \(height), \"\(timeSignature)\", \(scalingFactor));"
+            print("[VexFlow] Executing JS: \(js.prefix(150))...")
 
             webView.evaluateJavaScript(js) { result, error in
                 if let error = error {
@@ -167,24 +172,35 @@ struct SheetMusicView: View {
 
     let notation: String
     let label: String?
-    let width: CGFloat
-    let height: CGFloat
+    let width: CGFloat        // Logical width for VexFlow rendering
+    let height: CGFloat       // Logical height for VexFlow rendering
+    let frameWidth: CGFloat   // Actual frame width (fills available space)
     let timeSignature: String
+    let scalingFactor: CGFloat
 
     // Layout constants matching the JavaScript
     private static let firstMeasureAdditionalWidth: CGFloat = 50
     private static let measureHeight: CGFloat = 75
+    // Reference width for scaling calculation (matches React app)
+    private static let referenceWidth: CGFloat = 900
 
-    init(notation: String, label: String? = nil, width: CGFloat = 300, height: CGFloat = 120, timeSignature: String = "4/4") {
+    init(notation: String, label: String?, width: CGFloat, height: CGFloat, timeSignature: String) {
         self.notation = notation
         self.label = label
         self.width = width
         self.height = height
+        self.frameWidth = width  // For simple notation, frame matches content
         self.timeSignature = timeSignature
+        self.scalingFactor = 1.0
     }
 
     /// Initialize with a DiscretePassage (calculates dimensions automatically)
-    init(passage: DiscretePassage, label: String?, timeSignature: String) {
+    /// - Parameters:
+    ///   - passage: The passage to display
+    ///   - label: Optional label shown to the left
+    ///   - timeSignature: Time signature string (e.g., "4/4")
+    ///   - maxWidth: Maximum width constraint for the sheet music (calculates scaling factor)
+    init(passage: DiscretePassage, label: String?, timeSignature: String, maxWidth: CGFloat) {
         // Convert passage to JSON string for JavaScript
         // Note: Do NOT use convertToSnakeCase - the JS expects camelCase (noteDurations, noteName, etc.)
         print(passage)
@@ -200,14 +216,21 @@ struct SheetMusicView: View {
         self.label = label
         self.timeSignature = timeSignature
 
-        // Calculate dimensions based on passage content
-        let dimensions = Self.computeDimensions(for: passage)
+        // Calculate logical dimensions for VexFlow (unconstrained by screen size)
+        let dimensions = Self.computeLogicalDimensions(for: passage)
         self.width = dimensions.width
         self.height = dimensions.height
+
+        // Calculate scaling factor: min(1.0, maxWidth / logicalWidth)
+        // This scales the canvas content to fit the available space
+        self.scalingFactor = min(1.0, maxWidth / dimensions.width)
+
+        // Frame width fills available space (up to logical width)
+        self.frameWidth = min(maxWidth, dimensions.width)
     }
 
-    /// Compute dimensions based on measure content (mirrors JavaScript logic)
-    private static func computeDimensions(for passage: DiscretePassage) -> (width: CGFloat, height: CGFloat) {
+    /// Compute logical dimensions based on measure content (without screen constraints)
+    private static func computeLogicalDimensions(for passage: DiscretePassage) -> (width: CGFloat, height: CGFloat) {
         let measures = passage.measures
         guard !measures.isEmpty else {
             return (width: 300, height: 120)
@@ -252,25 +275,35 @@ struct SheetMusicView: View {
         return (width: width, height: height)
     }
 
+    // Scaled height for the frame (width uses frameWidth which fills available space)
+    private var scaledHeight: CGFloat { height * scalingFactor }
+
     var body: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
             if let label = label {
                 Text(label)
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(themeManager.colors.textNeutral)
-                    .frame(width: 50, alignment: .leading)
             }
 
-            SheetMusicWebView(notation: notation, width: width, height: height, timeSignature: timeSignature)
-                .frame(width: width, height: height)
-                .background(Color.white)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-                )
+            SheetMusicWebView(
+                notation: notation,
+                width: width,
+                height: height,
+                timeSignature: timeSignature,
+                scalingFactor: scalingFactor
+            )
+            .frame(width: frameWidth, height: scaledHeight)
+            .background(Color.white)
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+            )
         }
+        .frame(width: frameWidth)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -370,14 +403,16 @@ struct NotePreview: View {
             notation: "C4/q, D4/q, E4/q, F4/q",
             label: "Target",
             width: 300,
-            height: 120
+            height: 120,
+            timeSignature: "4/4"
         )
         .environmentObject(ThemeManager.shared)
 
         SheetMusicView(
             passage: DiscretePassage.samplePassage,
             label: "Sample",
-            timeSignature: "4/4"
+            timeSignature: "4/4",
+            maxWidth: 400
         )
         .environmentObject(ThemeManager.shared)
     }

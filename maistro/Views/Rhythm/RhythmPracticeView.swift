@@ -19,6 +19,13 @@ struct RhythmPracticeView: View {
     @State private var showSettings = false
     @State private var isTapping = false
 
+    // Shared metronome engine for compact and full views
+    @StateObject private var metronomeEngine = MetronomeEngine()
+
+    // Expandable section state
+    @State private var isToolsExpanded: Bool = false
+    @State private var hasInitializedExpandedState: Bool = false
+
     // Target passage for practice
     @State private var targetPassage: DiscretePassage?
 
@@ -40,116 +47,265 @@ struct RhythmPracticeView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Two-column layout: Evaluation chart | Controls + Metronome
-                
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(spacing: 8) {
-                        
+        GeometryReader { geometry in
+            let screenWidth = geometry.size.width
+            // Responsive sizing calculations
+            let isCompact = screenWidth < 400
+            let radarSize = min(max(screenWidth * 0.45, 140), 225)  // Min 140, max 225
+            let metronomeScale = min(max(screenWidth / 400, 0.7), 1.0)  // Scale 0.7-1.0
+            let sheetMusicWidth = min(screenWidth - 40, 600)  // Max 600 for iPad
+            let tapButtonSize = min(max(screenWidth * 0.18, 60), 80)  // Min 60, max 80
+            let compactButtonSize: CGFloat = 44
 
-                        // Column 1: Evaluation chart
-                        RadarChartView(
-                            dataPoints: [
-                                RadarChartDataPoint(id: "duration", label: "Duration", score: durationScore),
-                                RadarChartDataPoint(id: "rhythm", label: "Rhythm", score: rhythmScore),
-                                RadarChartDataPoint(id: "pitch", label: "Pitch", score: pitchScore)
-                            ],
-                            size: 225,
-                            labelPadding: 10,
-                            onAxisTapped: nil
-                        )
-                        .padding(12)
-                        .background(themeManager.colors.neutral)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-                        )
-                    }
+            ScrollView {
+                VStack(spacing: 16) {
+                    // Expandable tools section
+                    ExpandableSection(
+                        isExpanded: $isToolsExpanded,
+                        expandIconSize: 20,
+                        compactContent: {
+                            // Compact score view
+                            CompactScoreView(
+                                scores: [durationScore, rhythmScore, pitchScore],
+                                size: compactButtonSize,
+                                onTap: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isToolsExpanded = true
+                                    }
+                                }
+                            )
 
-                    // Column 2: Controls and Metronome
-                    VStack(spacing: 16) {
-                        // Top row: 3 control buttons
-                        HStack(spacing: 8) {
+                            // Control buttons
                             ThemedButton(
                                 systemName: "arrow.counterclockwise",
                                 type: .neutral,
                                 size: .small,
                                 action: clearAttempt
                             )
-                            
+
                             ThemedButton(
                                 systemName: "forward.fill",
                                 type: .neutral,
                                 size: .small,
                                 action: newPassage
                             )
-                            
+
                             ThemedButton(
                                 systemName: "gearshape",
                                 type: .neutral,
                                 size: .small,
                                 action: { showSettings = true }
                             )
-                        }
-                        // Bottom row: Metronome
-                        Metronome(
-                            initialTempo: tempo,
-                            onTempoChange: { newTempo in
-                                tempo = newTempo
+
+                            // Compact metronome button
+                            CompactMetronomeButton(
+                                engine: metronomeEngine,
+                                size: compactButtonSize,
+                                onTap: nil
+                            )
+                        },
+                        expandedContent: {
+                            // Full expanded view
+                            if isCompact {
+                                // Compact layout: stack vertically
+                                VStack(spacing: 12) {
+                                    // Row 1: Radar chart and controls side by side
+                                    HStack(alignment: .top, spacing: 12) {
+                                        // Evaluation chart
+                                        RadarChartView(
+                                            dataPoints: [
+                                                RadarChartDataPoint(id: "duration", label: "Duration", score: durationScore),
+                                                RadarChartDataPoint(id: "rhythm", label: "Rhythm", score: rhythmScore),
+                                                RadarChartDataPoint(id: "pitch", label: "Pitch", score: pitchScore)
+                                            ],
+                                            size: radarSize,
+                                            labelPadding: 8,
+                                            onAxisTapped: nil
+                                        )
+                                        .padding(8)
+                                        .background(themeManager.colors.neutral)
+                                        .cornerRadius(12)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+                                        )
+
+                                        // Controls and Metronome
+                                        VStack(spacing: 8) {
+                                            // Control buttons
+                                            HStack(spacing: 6) {
+                                                ThemedButton(
+                                                    systemName: "arrow.counterclockwise",
+                                                    type: .neutral,
+                                                    size: .small,
+                                                    action: clearAttempt
+                                                )
+
+                                                ThemedButton(
+                                                    systemName: "forward.fill",
+                                                    type: .neutral,
+                                                    size: .small,
+                                                    action: newPassage
+                                                )
+
+                                                ThemedButton(
+                                                    systemName: "gearshape",
+                                                    type: .neutral,
+                                                    size: .small,
+                                                    action: { showSettings = true }
+                                                )
+                                            }
+
+                                            // Metronome
+                                            Metronome(
+                                                engine: metronomeEngine,
+                                                initialTempo: tempo,
+                                                minTempo: 40,
+                                                maxTempo: 260,
+                                                metronomeAngle: 80,
+                                                scale: metronomeScale,
+                                                onTempoChange: { newTempo in
+                                                    tempo = newTempo
+                                                }
+                                            )
+                                            .padding(.horizontal, 16 * metronomeScale)
+                                            .padding(.vertical, 6)
+                                            .background(themeManager.colors.neutral)
+                                            .cornerRadius(12)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Regular layout: side by side with more spacing
+                                HStack(alignment: .top, spacing: 16) {
+                                    VStack(spacing: 8) {
+                                        // Column 1: Evaluation chart
+                                        RadarChartView(
+                                            dataPoints: [
+                                                RadarChartDataPoint(id: "duration", label: "Duration", score: durationScore),
+                                                RadarChartDataPoint(id: "rhythm", label: "Rhythm", score: rhythmScore),
+                                                RadarChartDataPoint(id: "pitch", label: "Pitch", score: pitchScore)
+                                            ],
+                                            size: radarSize,
+                                            labelPadding: 10,
+                                            onAxisTapped: nil
+                                        )
+                                        .padding(12)
+                                        .background(themeManager.colors.neutral)
+                                        .cornerRadius(12)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+                                        )
+                                    }
+
+                                    // Column 2: Controls and Metronome
+                                    VStack(spacing: 16) {
+                                        // Top row: 3 control buttons
+                                        HStack(spacing: 8) {
+                                            ThemedButton(
+                                                systemName: "arrow.counterclockwise",
+                                                type: .neutral,
+                                                size: .small,
+                                                action: clearAttempt
+                                            )
+
+                                            ThemedButton(
+                                                systemName: "forward.fill",
+                                                type: .neutral,
+                                                size: .small,
+                                                action: newPassage
+                                            )
+
+                                            ThemedButton(
+                                                systemName: "gearshape",
+                                                type: .neutral,
+                                                size: .small,
+                                                action: { showSettings = true }
+                                            )
+                                        }
+                                        // Bottom row: Metronome
+                                        Metronome(
+                                            engine: metronomeEngine,
+                                            initialTempo: tempo,
+                                            minTempo: 40,
+                                            maxTempo: 260,
+                                            metronomeAngle: 80,
+                                            scale: metronomeScale,
+                                            onTempoChange: { newTempo in
+                                                tempo = newTempo
+                                            }
+                                        )
+                                        .padding(.horizontal, 24 * metronomeScale)
+                                        .padding(.vertical, 8)
+                                        .background(themeManager.colors.neutral)
+                                        .cornerRadius(16)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+                                        )
+                                    }
+                                }
                             }
-                        )
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 8)
-                        .background(themeManager.colors.neutral)
-                        .cornerRadius(16)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-                        )
-                    }
-                }
-                .padding(.horizontal)
-
-                // Sheet music displays
-                VStack(spacing: 16) {
-                    // Target passage
-                    if let passage = targetPassage {
-                        SheetMusicView(
-                            passage: passage,
-                            label: "Target",
-                            timeSignature: timeSignature
-                        )
-                    } else {
-                        SheetMusicView(
-                            notation: "",
-                            label: "Target",
-                            timeSignature: timeSignature
-                        )
-                    }
-
-                    // Played passage
-                    SheetMusicView(
-                        passage: playedPassage ?? DiscretePassage.blank(
-                            measureCount: measureCount,
-                            subdivisionDenominator: smallestSubdivision
-                        ),
-                        label: "Played",
-                        timeSignature: timeSignature
+                        }
                     )
-                }
-                .padding(.horizontal)
+                    .padding(.horizontal, isCompact ? 12 : 16)
 
-                // Tap button
-                TapButton(
-                    isTapping: $isTapping,
-                    onTapDown: sendTapDown,
-                    onTapUp: sendTapUp
-                )
-                .padding(.top, 20)
+                    // Sheet music displays
+                    VStack(spacing: 16) {
+                        // Target passage
+                        if let passage = targetPassage {
+                            SheetMusicView(
+                                passage: passage,
+                                label: "Target",
+                                timeSignature: timeSignature,
+                                maxWidth: sheetMusicWidth
+                            )
+                        } else {
+                            SheetMusicView(
+                                notation: "",
+                                label: "Target",
+                                width: min(300, sheetMusicWidth),
+                                height: 120,
+                                timeSignature: timeSignature
+                            )
+                        }
+
+                        // Played passage
+                        SheetMusicView(
+                            passage: playedPassage ?? DiscretePassage.blank(
+                                measureCount: measureCount,
+                                subdivisionDenominator: smallestSubdivision
+                            ),
+                            label: "Played",
+                            timeSignature: timeSignature,
+                            maxWidth: sheetMusicWidth
+                        )
+                    }
+                    .padding(.horizontal, isCompact ? 12 : 16)
+
+                    // Tap button
+                    TapButton(
+                        isTapping: $isTapping,
+                        size: tapButtonSize,
+                        onTapDown: sendTapDown,
+                        onTapUp: sendTapUp
+                    )
+                    .padding(.top, 16)
+                }
+                .padding(.vertical)
             }
-            .padding(.vertical)
+            .onAppear {
+                // Set default expanded state based on screen size
+                if !hasInitializedExpandedState {
+                    isToolsExpanded = !isCompact
+                    hasInitializedExpandedState = true
+                }
+            }
         }
         .safeAreaInset(edge: .top) {
             AppHeaderView(
@@ -293,13 +449,14 @@ struct RhythmPracticeView: View {
 struct TapButton: View {
     @EnvironmentObject var themeManager: ThemeManager
     @Binding var isTapping: Bool
+    let size: CGFloat
     let onTapDown: () -> Void
     let onTapUp: () -> Void
 
     var body: some View {
         Circle()
             .fill(isTapping ? themeManager.colors.primaryHover : themeManager.colors.primary)
-            .frame(width: 80, height: 80)
+            .frame(width: size, height: size)
             .overlay(
                 Text("Tap")
                     .font(.headline)

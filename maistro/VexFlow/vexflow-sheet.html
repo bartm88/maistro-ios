@@ -29,17 +29,21 @@
         let context = null;
 
         // Main render function - supports both simple notation and JSON passage
-        function renderNotation(notationString, width, height, timeSignature = '4/4') {
-            console.log('[VexFlow] renderNotation called:', { notationString: notationString.substring(0, 50), width, height, timeSignature });
+        // scalingFactor: 0.0-1.0, computed as min(1.0, screenWidth / 900.0)
+        function renderNotation(notationString, width, height, timeSignature = '4/4', scalingFactor = 1.0) {
+            console.log('[VexFlow] renderNotation called:', { notationString: notationString.substring(0, 50), width, height, timeSignature, scalingFactor });
 
             const container = document.getElementById('output');
             container.innerHTML = '';
+
+            // Clamp scaling factor between 0.5 and 1.0
+            const scale = Math.max(0.5, Math.min(1.0, scalingFactor));
 
             // Try to parse as JSON passage first
             try {
                 if (notationString.startsWith('{') || notationString.startsWith('[')) {
                     const passage = JSON.parse(notationString);
-                    renderPassage(passage, container, width, height, timeSignature);
+                    renderPassage(passage, container, width, height, timeSignature, scale);
                     return;
                 }
             } catch (e) {
@@ -47,7 +51,7 @@
             }
 
             // Fall back to simple notation parsing
-            renderSimpleNotation(notationString, container, width, height, timeSignature);
+            renderSimpleNotation(notationString, container, width, height, timeSignature, scale);
         }
 
         const FIRST_MEASURE_ADDITIONAL_WIDTH = 50;
@@ -84,9 +88,9 @@
         }
 
         // Render a discrete passage (JSON format from Swift)
-        function renderPassage(passage, container, width, height, timeSignature) {
+        function renderPassage(passage, container, width, height, timeSignature, scalingFactor) {
             const measures = passage.measures || [];
-            console.log('[VexFlow] Rendering passage with', measures.length, 'measures');
+            console.log('[VexFlow] Rendering passage with', measures.length, 'measures, scale:', scalingFactor);
 
             const { measureWidth, measuresPerLine } = computeMeasureDimensions(measures);
             const numLines = Math.max(1, Math.ceil(measures.length / measuresPerLine));
@@ -94,8 +98,12 @@
 
             console.log('[VexFlow] Layout:', { measureWidth, measuresPerLine, numLines, requiredHeight });
 
+            // Apply scaling factor to canvas dimensions
+            const scaledWidth = width * scalingFactor;
+            const scaledHeight = Math.max(height, requiredHeight) * scalingFactor;
+
             const factory = new Factory({
-                renderer: { elementId: 'output', width: width, height: Math.max(height, requiredHeight) }
+                renderer: { elementId: 'output', width: scaledWidth, height: scaledHeight }
             });
 
             const score = factory.EasyScore();
@@ -192,15 +200,24 @@
                 factory.StaveTie({ from: tie.from, to: tie.to });
             });
 
+            // Scale the context before drawing
+            factory.getContext().scale(scalingFactor, scalingFactor);
             factory.draw();
         }
 
         // Render simple comma-separated notation string
-        function renderSimpleNotation(notationString, container, width, height, timeSignature) {
+        function renderSimpleNotation(notationString, container, width, height, timeSignature, scalingFactor) {
+            // Apply scaling factor to canvas dimensions
+            const scaledWidth = width * scalingFactor;
+            const scaledHeight = height * scalingFactor;
+
             renderer = new Renderer(container, Renderer.Backends.SVG);
-            renderer.resize(width, height);
+            renderer.resize(scaledWidth, scaledHeight);
             context = renderer.getContext();
             context.setFont('Arial', 10);
+
+            // Scale the context
+            context.scale(scalingFactor, scalingFactor);
 
             const staveWidth = width - 20;
             const stave = new Stave(10, 10, staveWidth);

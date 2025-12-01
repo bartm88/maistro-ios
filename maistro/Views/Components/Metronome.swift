@@ -123,27 +123,41 @@ class MetronomeEngine: ObservableObject {
 
 struct Metronome: View {
     @EnvironmentObject var themeManager: ThemeManager
-    @StateObject private var engine = MetronomeEngine()
+    @ObservedObject var engine: MetronomeEngine
 
     let initialTempo: Double
     let minTempo: Double
     let maxTempo: Double
     let metronomeAngle: Double
+    let scale: CGFloat
     let onTempoChange: ((Double) -> Void)?
 
     @State private var tempoText: String = ""
 
+    // Scaled dimensions
+    private var arcWidth: CGFloat { 80 * scale }
+    private var arcHeight: CGFloat { 70 * scale }
+    private var metronomeHeight: CGFloat { 80 * scale }
+    private var pivotSize: CGFloat { 12 * scale }
+    private var pivotOffset: CGFloat { 32 * scale }
+    private var sliderWidth: CGFloat { 80 * scale }
+    private var textFieldWidth: CGFloat { 40 * scale }
+
     init(
-        initialTempo: Double = 120,
-        minTempo: Double = 40,
-        maxTempo: Double = 260,
-        metronomeAngle: Double = 80,
-        onTempoChange: ((Double) -> Void)? = nil
+        engine: MetronomeEngine,
+        initialTempo: Double,
+        minTempo: Double,
+        maxTempo: Double,
+        metronomeAngle: Double,
+        scale: CGFloat,
+        onTempoChange: ((Double) -> Void)?
     ) {
+        self.engine = engine
         self.initialTempo = initialTempo
         self.minTempo = minTempo
         self.maxTempo = maxTempo
         self.metronomeAngle = metronomeAngle
+        self.scale = scale
         self.onTempoChange = onTempoChange
     }
 
@@ -160,28 +174,29 @@ struct Metronome: View {
     }
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 4 * scale) {
             // Metronome visual
             ZStack {
                 // Arc background (pie slice)
                 MetronomeArc(angle: metronomeAngle)
                     .fill(themeManager.colors.primary)
-                    .frame(width: 80, height: 70)
+                    .frame(width: arcWidth, height: arcHeight)
 
                 // Pendulum
                 PendulumView(
                     rotation: pendulumRotation,
                     duration: swingDuration,
+                    scale: scale,
                     color: themeManager.colors.textNeutral
                 )
 
                 // Base pivot point
                 Circle()
                     .fill(themeManager.colors.secondary)
-                    .frame(width: 12, height: 12)
-                    .offset(y: 32)
+                    .frame(width: pivotSize, height: pivotSize)
+                    .offset(y: pivotOffset)
             }
-            .frame(height: 80)
+            .frame(height: metronomeHeight)
             .onTapGesture {
                 engine.toggle()
             }
@@ -199,13 +214,13 @@ struct Metronome: View {
                     in: minTempo...maxTempo
                 )
                 .accentColor(themeManager.colors.primary)
-                .frame(width: 80)
+                .frame(width: sliderWidth)
             }
 
             // Tempo display
             HStack(spacing: 4) {
                 TextField("", text: $tempoText)
-                    .frame(width: 40)
+                    .frame(width: textFieldWidth)
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
                     .background(Color.white)
@@ -252,15 +267,18 @@ struct Metronome: View {
 struct PendulumView: View {
     let rotation: Double
     let duration: Double
+    let scale: CGFloat
     let color: Color
 
-    private let barHeight: CGFloat = 65
+    private var barHeight: CGFloat { 65 * scale }
+    private var barWidth: CGFloat { 4 * scale }
+    private var offsetY: CGFloat { 2 * scale }
 
     var body: some View {
         Rectangle()
             .fill(color)
-            .frame(width: 4, height: barHeight)
-            .offset(x: 0, y: 2)
+            .frame(width: barWidth, height: barHeight)
+            .offset(x: 0, y: offsetY)
             // Anchor at pivot point (6 from bottom)
             .rotationEffect(
                 .degrees(rotation),
@@ -279,7 +297,8 @@ struct MetronomeArc: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.maxY)
-        let radius: CGFloat = 66
+        // Scale radius based on the rect size (original was 66 for 80x70 frame)
+        let radius: CGFloat = rect.width * 0.825
 
         let startAngle = Angle(degrees: -90 - angle / 2)
         let endAngle = Angle(degrees: -90 + angle / 2)
@@ -301,7 +320,12 @@ struct MetronomeArc: Shape {
 
 #Preview {
     Metronome(
+        engine: MetronomeEngine(),
         initialTempo: 120,
+        minTempo: 40,
+        maxTempo: 260,
+        metronomeAngle: 80,
+        scale: 1.0,
         onTempoChange: { tempo in
             print("Tempo changed to: \(tempo)")
         }
