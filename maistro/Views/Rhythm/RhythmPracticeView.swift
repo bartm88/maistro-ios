@@ -123,6 +123,7 @@ struct RhythmPracticeView: View {
                                             onAxisTapped: nil
                                         )
                                         .padding(8)
+                                        .frame(maxHeight: .infinity, alignment: .center)
                                         .background(themeManager.colors.neutral)
                                         .cornerRadius(12)
                                         .overlay(
@@ -195,6 +196,7 @@ struct RhythmPracticeView: View {
                                             onAxisTapped: nil
                                         )
                                         .padding(12)
+                                        .frame(maxHeight: .infinity, alignment: .center)
                                         .background(themeManager.colors.neutral)
                                         .cornerRadius(12)
                                         .overlay(
