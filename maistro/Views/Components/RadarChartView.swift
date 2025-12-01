@@ -83,12 +83,6 @@ struct RadarChartView: View {
             axisLabels
         }
         .frame(width: size, height: size)
-        .background(themeManager.colors.neutral)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-        )
     }
 
     private var radarGrid: some View {

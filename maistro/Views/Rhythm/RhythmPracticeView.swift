@@ -55,9 +55,16 @@ struct RhythmPracticeView: View {
                                 RadarChartDataPoint(id: "rhythm", label: "Rhythm", score: rhythmScore),
                                 RadarChartDataPoint(id: "pitch", label: "Pitch", score: pitchScore)
                             ],
-                            size: 250,
-                            labelPadding: 25,
+                            size: 225,
+                            labelPadding: 10,
                             onAxisTapped: nil
+                        )
+                        .padding(12)
+                        .background(themeManager.colors.neutral)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
                         )
                     }
 
@@ -92,6 +99,14 @@ struct RhythmPracticeView: View {
                             onTempoChange: { newTempo in
                                 tempo = newTempo
                             }
+                        )
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 8)
+                        .background(themeManager.colors.neutral)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
                         )
                     }
                 }

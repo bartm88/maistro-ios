@@ -239,15 +239,6 @@ struct Metronome: View {
                 }
             )
         }
-        .padding([.horizontal], 24)
-        .padding([.vertical], 8)
-        .background(themeManager.colors.neutral)
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
-        )
-        .shadow(radius: 5)
         .onAppear {
             engine.tempo = initialTempo
             engine.minTempo = minTempo
