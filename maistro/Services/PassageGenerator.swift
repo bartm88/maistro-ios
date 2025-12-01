@@ -86,6 +86,29 @@ class PassageGenerator {
             allocatedSubdivisions += roll
         }
 
+        // If the entire measure is rests, consolidate into a single whole rest
+        let allRests = elements.allSatisfy { element in
+            if case .rest = element.element { return true }
+            return false
+        }
+
+        if allRests && !elements.isEmpty {
+            let wholeRestDurations = convertSubdivisionsToNoteDurations(
+                subdivisions: subdivisionsInMeasure,
+                startSubdivision: 0,
+                smallestSubdivision: smallestSubdivision
+            )
+            let wholeRest = DiscreteRest(restDurations: wholeRestDurations)
+            return DiscreteMeasure(
+                subdivisionDenominator: smallestSubdivision,
+                elements: [DiscreteMeasureElement(
+                    element: .rest(wholeRest),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                )]
+            )
+        }
+
         return DiscreteMeasure(
             subdivisionDenominator: smallestSubdivision,
             elements: elements
@@ -94,7 +117,9 @@ class PassageGenerator {
 
     /// Convert a number of subdivisions into note/rest durations
     /// This handles proper rhythmic notation using a greedy algorithm that finds
-    /// the largest note value that fits at each position.
+    /// the largest note value that fits at each position while respecting subdivision boundaries.
+    /// Each note value stays within its own "grid cell" (e.g., half notes don't cross half-measure
+    /// boundaries, quarter notes don't cross beat boundaries).
     /// - Parameters:
     ///   - subdivisions: Number of subdivisions to convert
     ///   - startSubdivision: The starting position within the measure
@@ -124,6 +149,10 @@ class PassageGenerator {
 
     /// Find the largest note duration that fits at the given position
     /// Returns the duration and how many subdivisions it consumes
+    /// - Parameters:
+    ///   - remaining: Number of subdivisions remaining to fill
+    ///   - position: Current position within the measure
+    ///   - smallestSubdivision: The resolution
     private func findLargestFittingDuration(
         remaining: Int,
         position: Int,
@@ -173,7 +202,20 @@ class PassageGenerator {
             let alignment = noteValue.alignment
 
             // Check if this note fits and is properly aligned
-            if subdivisionCount <= remaining && position % alignment == 0 {
+            guard subdivisionCount <= remaining && position % alignment == 0 else {
+                continue
+            }
+
+            // Check if this duration would cross its own subdivision boundary.
+            // Each note value has boundaries at multiples of its alignment:
+            // - Half notes: boundaries every half-measure
+            // - Quarter notes: boundaries every beat
+            // - Eighth notes: boundaries every half-beat
+            // A note starting at position P with alignment A has its next boundary at P + A.
+            // If the note's duration exceeds its alignment, it crosses into the next cell.
+            let crossesOwnBoundary = subdivisionCount > alignment
+
+            if !crossesOwnBoundary {
                 return (
                     DenominatorDots(denominator: noteValue.denominator, dots: noteValue.dots),
                     subdivisionCount

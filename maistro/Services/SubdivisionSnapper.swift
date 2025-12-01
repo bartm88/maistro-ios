@@ -183,6 +183,10 @@ struct RawToDiscreteConverter {
     }
 
     /// Find the largest duration that fits at the current position
+    /// - Parameters:
+    ///   - position: Current position within the measure
+    ///   - remaining: Number of subdivisions remaining to fill
+    ///   - resolution: Subdivision resolution
     private func findLargestFittingDuration(
         position: Int,
         remaining: Int,
@@ -199,18 +203,30 @@ struct RawToDiscreteConverter {
             let alignment = baseSubdivisions
             guard position % alignment == 0 else { continue }
 
-            // Try with dots
-            if baseSubdivisions * 7 / 4 <= remaining && baseSubdivisions >= 4 && position % (baseSubdivisions * 2) == 0 {
-                // Double dotted
-                return (DenominatorDots(denominator: denominator, dots: 2), baseSubdivisions * 7 / 4)
-            }
-            if baseSubdivisions * 3 / 2 <= remaining && baseSubdivisions >= 2 && position % (baseSubdivisions) == 0 {
-                // Single dotted
-                return (DenominatorDots(denominator: denominator, dots: 1), baseSubdivisions * 3 / 2)
-            }
-            if baseSubdivisions <= remaining {
-                // No dots
-                return (DenominatorDots(denominator: denominator, dots: 0), baseSubdivisions)
+            // Try with dots (from most to least)
+            let dotOptions: [(dots: Int, multiplierNum: Int, multiplierDen: Int, minBase: Int)] = [
+                (2, 7, 4, 4),  // Double dotted: 7/4 of base, requires base >= 4
+                (1, 3, 2, 2),  // Single dotted: 3/2 of base, requires base >= 2
+                (0, 1, 1, 1),  // No dots: 1/1 of base
+            ]
+
+            for dotOption in dotOptions {
+                guard baseSubdivisions >= dotOption.minBase else { continue }
+                let subdivisionCount = baseSubdivisions * dotOption.multiplierNum / dotOption.multiplierDen
+                guard subdivisionCount <= remaining else { continue }
+
+                // Check if this duration would cross its own subdivision boundary.
+                // Each note value has boundaries at multiples of its alignment:
+                // - Half notes: boundaries every half-measure
+                // - Quarter notes: boundaries every beat
+                // - Eighth notes: boundaries every half-beat
+                // A note starting at position P with alignment A has its next boundary at P + A.
+                // If the note's duration exceeds its alignment, it crosses into the next cell.
+                let crossesOwnBoundary = subdivisionCount > alignment
+
+                if !crossesOwnBoundary {
+                    return (DenominatorDots(denominator: denominator, dots: dotOption.dots), subdivisionCount)
+                }
             }
         }
 

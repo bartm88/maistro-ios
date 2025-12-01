@@ -39,6 +39,48 @@ struct TimeSignature: Codable, Equatable {
         // e.g., 4/4 with subdivision=16 -> 16 sixteenths
         return numerator * smallestSubdivision / denominator
     }
+
+    /// Returns the subdivision positions where strong beats occur.
+    /// Strong beats should not be obscured by notes/rests spanning across them.
+    /// - Parameter smallestSubdivision: The smallest note value resolution
+    /// - Returns: Array of subdivision positions that are strong beats
+    func strongBeatPositions(smallestSubdivision: Int) -> [Int] {
+        let subdivisionsPerBeat = smallestSubdivision / denominator
+
+        // Determine which beats are strong based on time signature
+        let strongBeats: [Int]
+        switch (numerator, denominator) {
+        // Simple time signatures
+        case (4, 4):
+            // Beat 1 and beat 3 are strong
+            strongBeats = [0, 2]
+        case (3, 4):
+            // Only beat 1 is strong
+            strongBeats = [0]
+        case (2, 4):
+            // Only beat 1 is strong
+            strongBeats = [0]
+        case (2, 2):
+            // Beat 1 is strong
+            strongBeats = [0]
+        // Compound time signatures (denominator 8, numerator divisible by 3)
+        case (6, 8):
+            // Two groups of 3: beats 1 and 4 (indices 0, 3)
+            strongBeats = [0, 3]
+        case (9, 8):
+            // Three groups of 3: beats 1, 4, 7 (indices 0, 3, 6)
+            strongBeats = [0, 3, 6]
+        case (12, 8):
+            // Four groups of 3: beats 1, 4, 7, 10 (indices 0, 3, 6, 9)
+            strongBeats = [0, 3, 6, 9]
+        default:
+            // For other signatures, treat each beat as a strong beat boundary
+            // This ensures proper notation at beat boundaries
+            strongBeats = Array(0..<numerator)
+        }
+
+        return strongBeats.map { $0 * subdivisionsPerBeat }
+    }
 }
 
 // MARK: - Duration Representation
