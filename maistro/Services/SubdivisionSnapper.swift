@@ -78,9 +78,9 @@ struct RawToDiscreteConverter {
     /// - Parameters:
     ///   - rawPassage: The raw passage to convert
     ///   - measureCount: Expected number of measures
-    ///   - noteName: The note name to use for all notes (rhythm practice uses a fixed pitch)
+    ///   - noteName: Optional fixed note name. If nil, uses actual pitch from each raw note.
     /// - Returns: A discrete passage with notes snapped to subdivisions
-    func convert(rawPassage: RawPassage, measureCount: Int, noteName: String) -> DiscretePassage {
+    func convert(rawPassage: RawPassage, measureCount: Int, noteName: String?) -> DiscretePassage {
         let subdivisionsPerMeasure = snapper.subdivisionsPerMeasure
         let resolution = snapper.config.subdivisionResolution
 
@@ -104,6 +104,9 @@ struct RawToDiscreteConverter {
             var currentMeasurePosition = startSubdivision % subdivisionsPerMeasure
             var remainingSubdivisions = totalDurationSubdivisions
 
+            // Use provided note name or derive from pitch
+            let noteNameToUse = noteName ?? rawNote.note.noteName
+
             // Process note across measure boundaries (creates tied notes)
             var isFirstPartOfNote = true
             while remainingSubdivisions > 0 && currentMeasureIndex < measureCount {
@@ -120,7 +123,7 @@ struct RawToDiscreteConverter {
                 )
 
                 let discreteNote = DiscreteNote(
-                    noteName: noteName,
+                    noteName: noteNameToUse,
                     noteDurations: noteDurations
                 )
 

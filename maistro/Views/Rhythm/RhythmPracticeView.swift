@@ -17,10 +17,14 @@ struct RhythmPracticeView: View {
     @State private var smallestSubdivision: Int = 8
     @State private var tempoSubdivision: Int = 4
     @State private var showSettings = false
+    @State private var showAudioInputSheet = false
     @State private var isTapping = false
 
     // Shared metronome engine for compact and full views
     @StateObject private var metronomeEngine = MetronomeEngine()
+
+    // MIDI input manager
+    @StateObject private var midiManager = MIDIManager(config: MIDIManagerConfig.standard())
 
     // Expandable section state
     @State private var isToolsExpanded: Bool = false
@@ -314,11 +318,15 @@ struct RhythmPracticeView: View {
                 title: "Rhythm Practice",
                 showBackButton: true,
                 showSettingsButton: true,
+                showAudioInputButton: true,
                 onBack: {
                     viewRouter.goBack()
                 },
                 onSettings: {
                     showingThemeSheet = true
+                },
+                onAudioInput: {
+                    showAudioInputSheet = true
                 }
             )
         }
@@ -336,6 +344,9 @@ struct RhythmPracticeView: View {
                 smallestSubdivision: $smallestSubdivision,
                 tempoSubdivision: $tempoSubdivision
             )
+        }
+        .sheet(isPresented: $showAudioInputSheet) {
+            AudioInputSheet(midiManager: midiManager)
         }
         .onAppear {
             generateNewPassage()
@@ -391,6 +402,10 @@ struct RhythmPracticeView: View {
                 evaluatePassage()
             }
             .store(in: &cancellables)
+
+        // Set up MIDI input
+        midiManager.setNoteInputListener(listener)
+        midiManager.initialize()
     }
 
     private func updatePlayedPassage() {
@@ -406,7 +421,7 @@ struct RhythmPracticeView: View {
         playedPassage = converter.convert(
             rawPassage: rawPlayedPassage,
             measureCount: measureCount,
-            noteName: "B4"
+            noteName: nil
         )
     }
 
@@ -485,6 +500,53 @@ struct TapButton: View {
                         onTapUp()
                     }
             )
+    }
+}
+
+struct MIDIStatusIndicator: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    @ObservedObject var midiManager: MIDIManager
+
+    var body: some View {
+        HStack(spacing: 6) {
+            // MIDI icon (piano keys)
+            Image(systemName: "pianokeys")
+                .font(.system(size: 16))
+
+            // Connection status
+            if let device = midiManager.connectedDevice {
+                Circle()
+                    .fill(themeManager.colors.confirmation)
+                    .frame(width: 8, height: 8)
+
+                Text(device.name)
+                    .font(.caption)
+                    .lineLimit(1)
+            } else if midiManager.isInitialized {
+                Circle()
+                    .fill(themeManager.colors.neutralAccent)
+                    .frame(width: 8, height: 8)
+
+                Text("No device")
+                    .font(.caption)
+            } else {
+                Circle()
+                    .fill(themeManager.colors.neutralAccent.opacity(0.5))
+                    .frame(width: 8, height: 8)
+
+                Text("Initializing...")
+                    .font(.caption)
+            }
+        }
+        .foregroundColor(themeManager.colors.textSecondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(themeManager.colors.neutral)
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+        )
     }
 }
 

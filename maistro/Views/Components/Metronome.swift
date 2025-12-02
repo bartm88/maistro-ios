@@ -24,6 +24,15 @@ class MetronomeEngine: ObservableObject {
     }
 
     private func setupAudio() {
+        // Configure audio session for playback on iOS/iPadOS
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try audioSession.setActive(true)
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
+
         audioEngine = AVAudioEngine()
         tonePlayer = AVAudioPlayerNode()
 

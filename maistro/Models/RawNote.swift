@@ -15,6 +15,30 @@ struct RawNote: Equatable, Codable {
 
     /// Duration in milliseconds
     let durationMs: UInt64
+
+    /// Convert deciHz to a note name (e.g., "C4", "F#5", "Bb3")
+    /// Uses standard A4 = 440Hz reference
+    var noteName: String {
+        RawNote.deciHzToNoteName(pitchDeciHz)
+    }
+
+    /// Convert deciHz to a note name
+    /// Formula: MIDI note = 69 + 12 * log2(freq / 440)
+    static func deciHzToNoteName(_ deciHz: UInt32) -> String {
+        let frequency = Double(deciHz) / 10.0
+        let midiNote = 69.0 + 12.0 * log2(frequency / 440.0)
+        let roundedMidi = Int(round(midiNote))
+
+        // Clamp to valid MIDI range
+        let clampedMidi = max(0, min(127, roundedMidi))
+
+        // Note names using sharps
+        let noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        let noteName = noteNames[clampedMidi % 12]
+        let octave = (clampedMidi / 12) - 1
+
+        return "\(noteName)\(octave)"
+    }
 }
 
 /// A raw note with its start time offset within a passage
