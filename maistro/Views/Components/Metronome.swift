@@ -232,7 +232,12 @@ struct Metronome: View {
                     .frame(width: textFieldWidth)
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
-                    .background(Color.white)
+                    .foregroundColor(themeManager.colors.textNeutral)
+                    .background(themeManager.colors.neutral)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(themeManager.colors.neutralAccent, lineWidth: 1)
+                    )
                     .cornerRadius(4)
                     .onAppear {
                         tempoText = String(Int(engine.tempo))

@@ -48,7 +48,7 @@ struct SheetMusicWebView: UIViewRepresentable {
         context.coordinator.timeSignature = timeSignature
         context.coordinator.scalingFactor = scalingFactor
 
-        if context.coordinator.isLoaded {
+        if context.coordinator.isLoaded && context.coordinator.needsRender {
             context.coordinator.renderNotation(webView: webView)
         }
     }
@@ -61,12 +61,35 @@ struct SheetMusicWebView: UIViewRepresentable {
         var scalingFactor: CGFloat
         var isLoaded = false
 
+        // Track last rendered state to avoid redundant renders
+        private var lastRenderedNotation: String?
+        private var lastRenderedWidth: CGFloat?
+        private var lastRenderedHeight: CGFloat?
+        private var lastRenderedTimeSignature: String?
+        private var lastRenderedScalingFactor: CGFloat?
+
         init(notation: String, width: CGFloat, height: CGFloat, timeSignature: String, scalingFactor: CGFloat) {
             self.notation = notation
             self.width = width
             self.height = height
             self.timeSignature = timeSignature
             self.scalingFactor = scalingFactor
+        }
+
+        var needsRender: Bool {
+            notation != lastRenderedNotation ||
+            width != lastRenderedWidth ||
+            height != lastRenderedHeight ||
+            timeSignature != lastRenderedTimeSignature ||
+            scalingFactor != lastRenderedScalingFactor
+        }
+
+        func markRendered() {
+            lastRenderedNotation = notation
+            lastRenderedWidth = width
+            lastRenderedHeight = height
+            lastRenderedTimeSignature = timeSignature
+            lastRenderedScalingFactor = scalingFactor
         }
 
         func loadVexFlowHTML(webView: WKWebView) {
@@ -146,19 +169,18 @@ struct SheetMusicWebView: UIViewRepresentable {
         }
 
         func renderNotation(webView: WKWebView) {
+            markRendered()
+
             let escapedNotation = notation
                 .replacingOccurrences(of: "\\", with: "\\\\")
                 .replacingOccurrences(of: "\"", with: "\\\"")
                 .replacingOccurrences(of: "\n", with: "\\n")
 
             let js = "renderNotation(\"\(escapedNotation)\", \(width), \(height), \"\(timeSignature)\", \(scalingFactor));"
-            print("[VexFlow] Executing JS: \(js.prefix(150))...")
 
-            webView.evaluateJavaScript(js) { result, error in
+            webView.evaluateJavaScript(js) { _, error in
                 if let error = error {
                     print("[VexFlow] JS render error: \(error)")
-                } else {
-                    print("[VexFlow] JS render success, result: \(String(describing: result))")
                 }
             }
         }
@@ -203,7 +225,6 @@ struct SheetMusicView: View {
     init(passage: DiscretePassage, label: String?, timeSignature: String, maxWidth: CGFloat) {
         // Convert passage to JSON string for JavaScript
         // Note: Do NOT use convertToSnakeCase - the JS expects camelCase (noteDurations, noteName, etc.)
-        print(passage)
         let encoder = JSONEncoder()
         if let jsonData = try? encoder.encode(passage),
            let jsonString = String(data: jsonData, encoding: .utf8) {
@@ -211,8 +232,6 @@ struct SheetMusicView: View {
         } else {
             self.notation = ""
         }
-        print(self.notation)
-        print("===============")
         self.label = label
         self.timeSignature = timeSignature
 
