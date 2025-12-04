@@ -62,110 +62,7 @@ protocol Evaluator {
     ) -> VectorEvaluation
 }
 
-/// Evaluates the timing accuracy of note start times
-struct StartTimeEvaluator: Evaluator {
-    /// Thresholds as fractions of a subdivision
-    /// - Within 0.5 subdivisions: no penalty
-    /// - 0.5 to 1.0 subdivisions: slight penalty (0.2)
-    /// - 1.0 to 2.0 subdivisions: moderate penalty (0.5)
-    /// - Beyond 2.0 subdivisions: severe penalty (1.0)
-    struct Thresholds {
-        let noPenaltyFraction: Double
-        let slightPenaltyFraction: Double
-        let moderatePenaltyFraction: Double
-
-        let slightPenalty: Double
-        let moderatePenalty: Double
-        let severePenalty: Double
-
-        static func `default`() -> Thresholds {
-            Thresholds(
-                noPenaltyFraction: 0.5,
-                slightPenaltyFraction: 1.0,
-                moderatePenaltyFraction: 2.0,
-                slightPenalty: 0.2,
-                moderatePenalty: 0.5,
-                severePenalty: 1.0
-            )
-        }
-    }
-
-    let thresholds: Thresholds
-
-    init(thresholds: Thresholds) {
-        self.thresholds = thresholds
-    }
-
-    func evaluate(
-        expected: RawPassage,
-        actual: RawPassage,
-        context: EvaluationContext
-    ) -> VectorEvaluation {
-        var passageCritiques: Set<String> = []
-        var noteCritiques: [Int: NoteCritique] = [:]
-        var score = 0.0
-
-        // Penalize for wrong number of notes
-        var measurePenalty = 1.0
-        if actual.notes.count < expected.notes.count {
-            passageCritiques.insert("Missed notes")
-            measurePenalty = Double(actual.notes.count) / Double(expected.notes.count)
-        } else if actual.notes.count > expected.notes.count {
-            passageCritiques.insert("Extra notes")
-            measurePenalty = Double(expected.notes.count) / Double(actual.notes.count)
-        }
-
-        guard !expected.notes.isEmpty else {
-            return VectorEvaluation(
-                score: actual.notes.isEmpty ? 1.0 : 0.0,
-                noteCritiques: [:],
-                passageCritiques: passageCritiques
-            )
-        }
-
-        let scorePerNote = 1.0 / Double(expected.notes.count)
-        let subdivisionDurationMs = context.subdivisionDurationMs
-
-        for (index, expectedNote) in expected.notes.enumerated() {
-            var notePenalty = 0.0
-
-            if index < actual.notes.count {
-                let actualNote = actual.notes[index]
-                let distance = abs(Int64(actualNote.startOffsetMs) - Int64(expectedNote.startOffsetMs))
-                let distanceDouble = Double(distance)
-
-                let isEarly = actualNote.startOffsetMs < expectedNote.startOffsetMs
-
-                // Determine penalty based on thresholds
-                if distanceDouble < subdivisionDurationMs * thresholds.noPenaltyFraction {
-                    // Within tolerance, no penalty
-                    notePenalty = 0.0
-                } else if distanceDouble < subdivisionDurationMs * thresholds.slightPenaltyFraction {
-                    // Slight penalty
-                    notePenalty = thresholds.slightPenalty
-                    noteCritiques[index] = isEarly ? .slightlyEarly : .slightlyLate
-                } else if distanceDouble < subdivisionDurationMs * thresholds.moderatePenaltyFraction {
-                    // Moderate penalty
-                    notePenalty = thresholds.moderatePenalty
-                    noteCritiques[index] = isEarly ? .moderatelyEarly : .moderatelyLate
-                } else {
-                    // Severe penalty
-                    notePenalty = thresholds.severePenalty
-                    noteCritiques[index] = isEarly ? .severelyEarly : .severelyLate
-                }
-
-                score += scorePerNote * (1.0 - notePenalty)
-            }
-            // Notes beyond actual count get 0 score (already accounted for in measurePenalty)
-        }
-
-        return VectorEvaluation(
-            score: score * measurePenalty,
-            noteCritiques: noteCritiques,
-            passageCritiques: passageCritiques
-        )
-    }
-}
+// StartTimeEvaluator moved to Evaluators/StartTimeEvaluator.swift
 
 /// Combined evaluation result for all aspects
 struct EvaluationResult {
@@ -184,12 +81,22 @@ struct PassageEvaluator {
 
     init(context: EvaluationContext) {
         self.context = context
-        self.startTimeEvaluator = StartTimeEvaluator(thresholds: .default())
+        self.startTimeEvaluator = StartTimeEvaluator(
+            thresholds: .default(),
+            chordToleranceMs: 50.0
+        )
     }
 
-    init(context: EvaluationContext, startTimeThresholds: StartTimeEvaluator.Thresholds) {
+    init(
+        context: EvaluationContext,
+        startTimeThresholds: StartTimeEvaluator.Thresholds,
+        chordToleranceMs: Double
+    ) {
         self.context = context
-        self.startTimeEvaluator = StartTimeEvaluator(thresholds: startTimeThresholds)
+        self.startTimeEvaluator = StartTimeEvaluator(
+            thresholds: startTimeThresholds,
+            chordToleranceMs: chordToleranceMs
+        )
     }
 
     /// Convert a discrete passage to a raw passage for evaluation
