@@ -87,6 +87,168 @@
             }
         }
 
+        // Calculate duration in subdivisions for a DenominatorDots object
+        function getDurationInSubdivisions(duration, subdivisionDenominator) {
+            const baseDuration = subdivisionDenominator / duration.denominator;
+            switch (duration.dots) {
+                case 0: return baseDuration;
+                case 1: return baseDuration * 3 / 2;
+                case 2: return baseDuration * 7 / 4;
+                default: return baseDuration;
+            }
+        }
+
+        // Get total duration of an element in subdivisions
+        function getElementDuration(element, subdivisionDenominator) {
+            if (element.element.Note) {
+                return element.element.Note.noteDurations.reduce((sum, d) =>
+                    sum + getDurationInSubdivisions(d, subdivisionDenominator), 0);
+            } else if (element.element.Rest) {
+                return element.element.Rest.restDurations.reduce((sum, d) =>
+                    sum + getDurationInSubdivisions(d, subdivisionDenominator), 0);
+            }
+            return 0;
+        }
+
+        // Group notes by start time and duration to form chords, then assign to voices
+        // Notes with same start time AND same duration become a chord (single StaveNote with multiple keys)
+        // Notes with different start times or durations that overlap go to different voices
+        function assignNotesToVoices(elements, subdivisionDenominator, totalSubdivisions) {
+            // First, group notes by start time and duration to form chords
+            const chordGroups = new Map(); // key: "startTime-duration", value: [elements]
+            const restElements = [];
+
+            elements.forEach(element => {
+                if (element.element.Note) {
+                    const startTime = element.startSubdivision;
+                    const duration = getElementDuration(element, subdivisionDenominator);
+                    const key = `${startTime}-${duration}`;
+
+                    if (!chordGroups.has(key)) {
+                        chordGroups.set(key, []);
+                    }
+                    chordGroups.get(key).push(element);
+                } else {
+                    restElements.push(element);
+                }
+            });
+
+            // Convert chord groups to chord events
+            const chordEvents = [];
+            chordGroups.forEach((noteElements, key) => {
+                const [startTime, duration] = key.split('-').map(Number);
+                chordEvents.push({
+                    type: 'chord',
+                    noteElements: noteElements,
+                    startSubdivision: startTime,
+                    duration: duration
+                });
+            });
+
+            // Add rest events
+            restElements.forEach(element => {
+                const startTime = element.startSubdivision;
+                const duration = getElementDuration(element, subdivisionDenominator);
+                chordEvents.push({
+                    type: 'rest',
+                    element: element,
+                    startSubdivision: startTime,
+                    duration: duration
+                });
+            });
+
+            // Sort by start time
+            chordEvents.sort((a, b) => a.startSubdivision - b.startSubdivision);
+
+            // Now assign chord events to voices based on overlap
+            const voices = [];
+
+            chordEvents.forEach(event => {
+                const startTime = event.startSubdivision;
+                const endTime = startTime + event.duration;
+
+                // Find a voice that's free at this start time
+                let assignedVoice = null;
+                for (const voice of voices) {
+                    if (voice.endTime <= startTime) {
+                        assignedVoice = voice;
+                        break;
+                    }
+                }
+
+                // If no free voice, create a new one
+                if (!assignedVoice) {
+                    assignedVoice = { endTime: 0, events: [] };
+                    voices.push(assignedVoice);
+                }
+
+                assignedVoice.events.push(event);
+                assignedVoice.endTime = endTime;
+            });
+
+            return voices;
+        }
+
+        // Convert subdivision duration to VexFlow duration string
+        function subdivisionsToDuration(subdivisions, subdivisionDenominator) {
+            // Common durations based on subdivision denominator (usually 8)
+            // subdivisions: 8 = whole, 6 = dotted half, 4 = half, 3 = dotted quarter,
+            // 2 = quarter, 1.5 = dotted eighth, 1 = eighth
+            const ratio = subdivisions / subdivisionDenominator;
+
+            if (ratio >= 1) return { denominator: 1, dots: 0 }; // whole
+            if (ratio >= 0.75) return { denominator: 2, dots: 1 }; // dotted half
+            if (ratio >= 0.5) return { denominator: 2, dots: 0 }; // half
+            if (ratio >= 0.375) return { denominator: 4, dots: 1 }; // dotted quarter
+            if (ratio >= 0.25) return { denominator: 4, dots: 0 }; // quarter
+            if (ratio >= 0.1875) return { denominator: 8, dots: 1 }; // dotted eighth
+            if (ratio >= 0.125) return { denominator: 8, dots: 0 }; // eighth
+            if (ratio >= 0.0625) return { denominator: 16, dots: 0 }; // sixteenth
+            return { denominator: 16, dots: 0 }; // default to sixteenth
+        }
+
+        // Fill gaps in a voice with rests
+        function fillVoiceWithRests(voiceEvents, totalSubdivisions, subdivisionDenominator) {
+            const filledEvents = [];
+            let currentPosition = 0;
+
+            voiceEvents.forEach(event => {
+                // Fill gap before this event with rests
+                while (currentPosition < event.startSubdivision) {
+                    const gap = event.startSubdivision - currentPosition;
+                    const restDuration = subdivisionsToDuration(gap, subdivisionDenominator);
+                    const restSubdivisions = getDurationInSubdivisions(restDuration, subdivisionDenominator);
+
+                    filledEvents.push({
+                        type: 'filler-rest',
+                        duration: restDuration,
+                        startSubdivision: currentPosition
+                    });
+                    currentPosition += restSubdivisions;
+                }
+
+                // Add the actual event (chord or rest)
+                filledEvents.push(event);
+                currentPosition = event.startSubdivision + event.duration;
+            });
+
+            // Fill remaining time with rests
+            while (currentPosition < totalSubdivisions) {
+                const gap = totalSubdivisions - currentPosition;
+                const restDuration = subdivisionsToDuration(gap, subdivisionDenominator);
+                const restSubdivisions = getDurationInSubdivisions(restDuration, subdivisionDenominator);
+
+                filledEvents.push({
+                    type: 'filler-rest',
+                    duration: restDuration,
+                    startSubdivision: currentPosition
+                });
+                currentPosition += restSubdivisions;
+            }
+
+            return filledEvents;
+        }
+
         // Render a discrete passage (JSON format from Swift)
         function renderPassage(passage, container, width, height, timeSignature, scalingFactor) {
             const measures = passage.measures || [];
@@ -97,6 +259,9 @@
             const requiredHeight = MEASURE_HEIGHT * numLines;
 
             console.log('[VexFlow] Layout:', { measureWidth, measuresPerLine, numLines, requiredHeight });
+
+            // Parse time signature
+            const [tsNum, tsDenom] = timeSignature.split('/').map(Number);
 
             // Apply scaling factor to canvas dimensions
             const scaledWidth = width * scalingFactor;
@@ -115,53 +280,122 @@
             const crossMeasureTies = [];
 
             measures.forEach((measure, measureIndex) => {
-                const voiceNotes = [];
-                let tieStartNote = null;
+                const subdivisionDenominator = measure.subdivisionDenominator || 8;
+                const totalSubdivisions = tsNum * subdivisionDenominator / tsDenom;
+
+                // Assign notes to voices based on overlap
+                const voiceAssignments = assignNotesToVoices(
+                    measure.elements,
+                    subdivisionDenominator,
+                    totalSubdivisions
+                );
+
+                console.log('[VexFlow] Measure', measureIndex, 'has', voiceAssignments.length, 'voices');
+
+                // Build VexFlow voices
+                const vexVoices = [];
                 let firstNoteOfMeasure = null;
                 let lastNoteOfMeasure = null;
 
-                measure.elements.forEach((element) => {
-                    if (element.element.Note) {
-                        const note = element.element.Note;
-                        const isTiedFromPrevious = element.tiedFromPrevious === true;
+                voiceAssignments.forEach((voiceData, voiceIndex) => {
+                    const voiceNotes = [];
+                    let tieStartNote = null;
 
-                        note.noteDurations.forEach((duration, durationIndex) => {
-                            const noteStr = `${note.noteName}/${duration.denominator}${'.'.repeat(duration.dots)}`;
-                            const staveNotes = score.notes(noteStr);
-                            const currentNote = staveNotes[0];
+                    // Fill voice with events (chords, rests, and gap-filling rests)
+                    const filledEvents = fillVoiceWithRests(
+                        voiceData.events,
+                        totalSubdivisions,
+                        subdivisionDenominator
+                    );
 
-                            // Track first note of measure for cross-measure ties
-                            if (firstNoteOfMeasure === null) {
-                                firstNoteOfMeasure = currentNote;
+                    filledEvents.forEach(event => {
+                        if (event.type === 'chord') {
+                            // Chord: multiple notes at same time with same duration
+                            const noteElements = event.noteElements;
 
-                                // If this note is tied from previous measure, record the tie
-                                if (isTiedFromPrevious && lastNoteOfPreviousMeasure) {
-                                    crossMeasureTies.push({
-                                        from: lastNoteOfPreviousMeasure,
-                                        to: currentNote
-                                    });
+                            // Get the first note's duration info (all notes in chord have same duration)
+                            const firstNote = noteElements[0].element.Note;
+                            const isTiedFromPrevious = noteElements.some(el => el.tiedFromPrevious === true);
+
+                            // Process each duration (for tied notes)
+                            firstNote.noteDurations.forEach((duration, durationIndex) => {
+                                // Build EasyScore notation string
+                                const durationStr = `${duration.denominator}${'.'.repeat(duration.dots)}`;
+
+                                let noteStr;
+                                if (noteElements.length === 1) {
+                                    // Single note: "B4/4"
+                                    noteStr = `${noteElements[0].element.Note.noteName}/${durationStr}`;
+                                } else {
+                                    // Chord: "(B4 D4 F4)/4"
+                                    const noteNames = noteElements
+                                        .map(el => el.element.Note.noteName)
+                                        .sort((a, b) => {
+                                            // Sort by octave first, then by note
+                                            const octA = parseInt(a.match(/\d+$/)[0]);
+                                            const octB = parseInt(b.match(/\d+$/)[0]);
+                                            if (octA !== octB) return octA - octB;
+                                            const noteOrder = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+                                            const noteA = a.match(/^[A-G][#b]?/)[0];
+                                            const noteB = b.match(/^[A-G][#b]?/)[0];
+                                            const baseA = noteA[0];
+                                            const baseB = noteB[0];
+                                            return noteOrder.indexOf(baseA) - noteOrder.indexOf(baseB);
+                                        })
+                                        .join(' ');
+                                    noteStr = `(${noteNames})/${durationStr}`;
                                 }
-                            }
 
-                            // Tie within same note element (multiple durations)
-                            if (durationIndex > 0 && tieStartNote) {
-                                factory.StaveTie({ from: tieStartNote, to: currentNote });
-                            }
+                                // Use EasyScore to create the note(s)
+                                const staveNotes = score.notes(noteStr);
+                                const staveNote = staveNotes[0];
 
-                            tieStartNote = currentNote;
-                            lastNoteOfMeasure = currentNote;
-                            voiceNotes.push(...staveNotes);
-                        });
-                    } else if (element.element.Rest) {
-                        const rest = element.element.Rest;
-                        rest.restDurations.forEach((duration) => {
-                            // VexFlow EasyScore: dots come AFTER the /r suffix
-                            // e.g., "B4/4/r." for dotted quarter rest
-                            const restStr = `B4/${duration.denominator}/r${'.'.repeat(duration.dots)}`;
-                            const staveNotes = score.notes(restStr);
-                            voiceNotes.push(...staveNotes);
-                        });
-                        tieStartNote = null;
+                                // Track first note of measure for cross-measure ties (only from voice 0)
+                                if (voiceIndex === 0 && firstNoteOfMeasure === null) {
+                                    firstNoteOfMeasure = staveNote;
+
+                                    if (isTiedFromPrevious && lastNoteOfPreviousMeasure) {
+                                        crossMeasureTies.push({
+                                            from: lastNoteOfPreviousMeasure,
+                                            to: staveNote
+                                        });
+                                    }
+                                }
+
+                                // Tie within same note element (multiple durations)
+                                if (durationIndex > 0 && tieStartNote) {
+                                    factory.StaveTie({ from: tieStartNote, to: staveNote });
+                                }
+
+                                tieStartNote = staveNote;
+                                if (voiceIndex === 0) {
+                                    lastNoteOfMeasure = staveNote;
+                                }
+                                voiceNotes.push(...staveNotes);
+                            });
+                        } else if (event.type === 'rest') {
+                            // Original rest from the passage
+                            const rest = event.element.element.Rest;
+                            rest.restDurations.forEach((duration) => {
+                                const restStr = `B4/${duration.denominator}/r${'.'.repeat(duration.dots)}`;
+                                const staveNotes = score.notes(restStr);
+                                voiceNotes.push(...staveNotes);
+                            });
+                            tieStartNote = null;
+                        } else if (event.type === 'filler-rest') {
+                            // Gap-filling rest
+                            const duration = event.duration;
+                            if (typeof duration === 'object') {
+                                const restStr = `B4/${duration.denominator}/r${'.'.repeat(duration.dots)}`;
+                                const staveNotes = score.notes(restStr);
+                                voiceNotes.push(...staveNotes);
+                            }
+                            tieStartNote = null;
+                        }
+                    });
+
+                    if (voiceNotes.length > 0) {
+                        vexVoices.push(score.voice(voiceNotes));
                     }
                 });
 
@@ -179,8 +413,7 @@
                         x: 10,
                         y: y
                     });
-                    const voices = voiceNotes.length > 0 ? [score.voice(voiceNotes)] : [];
-                    const stave = system.addStave({ voices: voices }).addClef('treble');
+                    const stave = system.addStave({ voices: vexVoices }).addClef('treble');
                     if (measureIndex === 0) {
                         stave.addTimeSignature(timeSignature);
                     }
@@ -190,8 +423,7 @@
                         x: 10 + FIRST_MEASURE_ADDITIONAL_WIDTH + measureWidth * positionInLine,
                         y: y
                     });
-                    const voices = voiceNotes.length > 0 ? [score.voice(voiceNotes)] : [];
-                    system.addStave({ voices: voices });
+                    system.addStave({ voices: vexVoices });
                 }
             });
 

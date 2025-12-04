@@ -417,23 +417,58 @@ struct NotePreview: View {
 // MARK: - Previews
 
 #Preview("Live WebView") {
-    VStack(spacing: 20) {
-        SheetMusicView(
-            notation: "C4/q, D4/q, E4/q, F4/q",
-            label: "Target",
-            width: 300,
-            height: 120,
-            timeSignature: "4/4"
-        )
-        .environmentObject(ThemeManager.shared)
+    ScrollView {
+        VStack(spacing: 20) {
+            SheetMusicView(
+                notation: "C4/q, D4/q, E4/q, F4/q",
+                label: "Simple Melody",
+                width: 300,
+                height: 120,
+                timeSignature: "4/4"
+            )
+            .environmentObject(ThemeManager.shared)
 
-        SheetMusicView(
-            passage: DiscretePassage.samplePassage,
-            label: "Sample",
-            timeSignature: "4/4",
-            maxWidth: 400
-        )
-        .environmentObject(ThemeManager.shared)
+            SheetMusicView(
+                passage: DiscretePassage.samplePassage,
+                label: "Mixed Rhythms",
+                timeSignature: "4/4",
+                maxWidth: 400
+            )
+            .environmentObject(ThemeManager.shared)
+
+            SheetMusicView(
+                passage: DiscretePassage.threeNoteChordPassage,
+                label: "3-Note Chords",
+                timeSignature: "4/4",
+                maxWidth: 400
+            )
+            .environmentObject(ThemeManager.shared)
+
+            SheetMusicView(
+                passage: DiscretePassage.offsetNotesPassage,
+                label: "Offset Notes",
+                timeSignature: "4/4",
+                maxWidth: 400
+            )
+            .environmentObject(ThemeManager.shared)
+
+            SheetMusicView(
+                passage: DiscretePassage.tiedNotesPassage,
+                label: "Cross-Measure Ties",
+                timeSignature: "4/4",
+                maxWidth: 400
+            )
+            .environmentObject(ThemeManager.shared)
+
+            SheetMusicView(
+                passage: DiscretePassage.multiDurationTiedPassage,
+                label: "Multi-Duration Ties",
+                timeSignature: "4/4",
+                maxWidth: 400
+            )
+            .environmentObject(ThemeManager.shared)
+        }
+        .padding()
     }
 }
 
@@ -512,5 +547,212 @@ extension DiscretePassage {
         )
 
         return DiscretePassage(measures: [measure1, measure2])
+    }()
+
+    /// A sample passage with 3-note chords (C-E-G triad) - demonstrates multi-voice rendering
+    static let threeNoteChordPassage: DiscretePassage = {
+        // Measure with a C major triad (C4, E4, G4) as half notes, then three quarter notes
+        let measure1 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                // Three notes starting at beat 1, each as half note (need separate voices)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "C4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "E4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "G4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                ),
+                // Second half: three quarter notes stacked (C5, E5, G5)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "C5",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "E5",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                ),
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "G5",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                )
+            ]
+        )
+
+        return DiscretePassage(measures: [measure1])
+    }()
+
+    /// A sample passage with offset notes (staggered entry) - demonstrates multi-voice with different start times
+    /// C4/2 on beat 1, E4/2 on beat 2, G4/2 on beat 3, Bb4/4 on beat 4
+    static let offsetNotesPassage: DiscretePassage = {
+        let measure1 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                // C4 half note starting at beat 1 (subdivision 0)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "C4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                ),
+                // E4 half note starting at beat 2 (subdivision 2)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "E4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 2,
+                    tiedFromPrevious: false
+                ),
+                // G4 half note starting at beat 3 (subdivision 4)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "G4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                ),
+                // Bb4 quarter note starting at beat 4 (subdivision 6)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "Bb4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 6,
+                    tiedFromPrevious: false
+                )
+            ]
+        )
+
+        return DiscretePassage(measures: [measure1])
+    }()
+
+    /// A sample passage with tied notes across measures - demonstrates cross-measure ties
+    static let tiedNotesPassage: DiscretePassage = {
+        // Measure 1: B4 half note (tied to next measure) + B4 half note
+        let measure1 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                // B4 half note starting at beat 1 (will be tied to next measure)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                ),
+                // B4 half note starting at beat 3
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                )
+            ]
+        )
+
+        // Measure 2: B4 half note (tied from previous) + quarter + quarter
+        let measure2 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                // B4 half note tied from previous measure
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: true
+                ),
+                // A4 quarter note
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "A4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                ),
+                // G4 quarter note
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "G4",
+                        noteDurations: [DenominatorDots(denominator: 4, dots: 0)]
+                    )),
+                    startSubdivision: 6,
+                    tiedFromPrevious: false
+                )
+            ]
+        )
+
+        return DiscretePassage(measures: [measure1, measure2])
+    }()
+
+    /// A sample passage with multi-duration tied notes (within same element)
+    static let multiDurationTiedPassage: DiscretePassage = {
+        // Measure with a note that has multiple durations (tied together)
+        let measure1 = DiscreteMeasure(
+            subdivisionDenominator: 8,
+            elements: [
+                // B4 with two quarter notes tied together (simulates a half note split across a beat)
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "B4",
+                        noteDurations: [
+                            DenominatorDots(denominator: 4, dots: 0),
+                            DenominatorDots(denominator: 4, dots: 0)
+                        ]
+                    )),
+                    startSubdivision: 0,
+                    tiedFromPrevious: false
+                ),
+                // A4 half note
+                DiscreteMeasureElement(
+                    element: .note(DiscreteNote(
+                        noteName: "A4",
+                        noteDurations: [DenominatorDots(denominator: 2, dots: 0)]
+                    )),
+                    startSubdivision: 4,
+                    tiedFromPrevious: false
+                )
+            ]
+        )
+
+        return DiscretePassage(measures: [measure1])
     }()
 }

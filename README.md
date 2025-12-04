@@ -11,3 +11,7 @@ Take midi notes as input and update the UI accordingly.
 Take raw audio as input and update the UI accordingly.
 
 Acommodate multiple notes at once (polyphony)
+
+Ties across measures on different lines look terrible.
+
+Multiple notes at once will need some better thinking for rhythm matching (comparing start times of notes in an ordered list doesn't work)
