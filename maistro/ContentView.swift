@@ -37,6 +37,10 @@ struct ContentView: View {
                 SandboxView()
                     .transition(.move(edge: .trailing))
 
+            case .tuner:
+                TunerView()
+                    .transition(.move(edge: .trailing))
+
             case .pitch, .song, .sightread, .improvisation:
                 // Placeholder for future views
                 ComingSoonView(viewName: viewRouter.currentView.rawValue.capitalized)

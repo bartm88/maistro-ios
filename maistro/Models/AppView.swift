@@ -15,6 +15,7 @@ enum AppView: String, CaseIterable, Identifiable {
     case song
     case sightread
     case improvisation
+    case tuner
 
     var id: String { rawValue }
 }
@@ -76,5 +77,12 @@ let appCards: [CardData] = [
         description: "Improvise over a backing track",
         view: .improvisation,
         disabled: true
+    ),
+    CardData(
+        id: "tuner",
+        title: "Tuner",
+        description: "Tune your instrument with microphone input",
+        view: .tuner,
+        disabled: false
     )
 ]
