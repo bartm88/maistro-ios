@@ -9,7 +9,15 @@ import SwiftUI
 struct TunerView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var viewRouter: ViewRouter
-    @StateObject private var pitchDetector = PitchDetector(config: PitchDetectorConfig.standard())
+    @StateObject private var pitchDetector = PitchDetector(
+        config: PitchDetectorConfig(
+            sampleRate: 44100.0,
+            bufferSize: 4096,
+            minFrequency: 60.0,
+            maxFrequency: 2000.0
+        ),
+        algorithm: PitchDetectorFactory.createAggregateDetector()
+    )
     @State private var showingThemeSheet = false
 
     var body: some View {

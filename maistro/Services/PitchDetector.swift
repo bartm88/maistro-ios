@@ -2,7 +2,7 @@
 //  PitchDetector.swift
 //  maistro
 //
-//  Microphone pitch detection using autocorrelation algorithm
+//  Microphone pitch detection with pluggable algorithm support
 
 import Foundation
 import AVFoundation
@@ -14,13 +14,11 @@ struct PitchDetectorConfig {
     let minFrequency: Double
     let maxFrequency: Double
 
-    static func standard() -> PitchDetectorConfig {
-        PitchDetectorConfig(
-            sampleRate: 44100.0,
-            bufferSize: 4096,
-            minFrequency: 60.0,  // ~B1
-            maxFrequency: 2000.0 // ~B6
-        )
+    init(sampleRate: Double, bufferSize: Int, minFrequency: Double, maxFrequency: Double) {
+        self.sampleRate = sampleRate
+        self.bufferSize = bufferSize
+        self.minFrequency = minFrequency
+        self.maxFrequency = maxFrequency
     }
 }
 
@@ -59,6 +57,7 @@ struct PitchDetection {
 @MainActor
 class PitchDetector: ObservableObject {
     private let config: PitchDetectorConfig
+    private let algorithm: PitchDetectionAlgorithm
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
 
@@ -67,13 +66,17 @@ class PitchDetector: ObservableObject {
     @Published var hasPermission: Bool = false
     @Published var permissionDenied: Bool = false
 
+    /// Name of the algorithm being used
+    var algorithmName: String { algorithm.name }
+
     private var pitchSubject = PassthroughSubject<PitchDetection, Never>()
     var pitchPublisher: AnyPublisher<PitchDetection, Never> {
         pitchSubject.eraseToAnyPublisher()
     }
 
-    init(config: PitchDetectorConfig) {
+    init(config: PitchDetectorConfig, algorithm: PitchDetectionAlgorithm) {
         self.config = config
+        self.algorithm = algorithm
     }
 
     func requestPermission() async {
@@ -185,12 +188,17 @@ class PitchDetector: ObservableObject {
             return
         }
 
-        // Detect pitch using autocorrelation
-        if let (frequency, confidence) = detectPitch(samples: samples, sampleRate: sampleRate) {
+        // Detect pitch using the configured algorithm
+        if let estimate = algorithm.detectPitch(
+            samples: samples,
+            sampleRate: sampleRate,
+            minFrequency: config.minFrequency,
+            maxFrequency: config.maxFrequency
+        ) {
             let detection = PitchDetection(
-                frequency: frequency,
+                frequency: estimate.frequency,
                 amplitude: amplitude,
-                confidence: confidence
+                confidence: estimate.confidence
             )
 
             Task { @MainActor in
@@ -202,51 +210,6 @@ class PitchDetector: ObservableObject {
                 self.currentPitch = nil
             }
         }
-    }
-
-    /// Autocorrelation-based pitch detection
-    private func detectPitch(samples: [Float], sampleRate: Double) -> (frequency: Double, confidence: Double)? {
-        let minPeriod = Int(sampleRate / config.maxFrequency)
-        let maxPeriod = Int(sampleRate / config.minFrequency)
-
-        guard maxPeriod < samples.count else { return nil }
-
-        var bestCorrelation: Float = 0
-        var bestPeriod: Int = 0
-
-        // Autocorrelation
-        for period in minPeriod..<maxPeriod {
-            var correlation: Float = 0
-            var energy1: Float = 0
-            var energy2: Float = 0
-
-            let windowSize = min(period * 2, samples.count - period)
-
-            for i in 0..<windowSize {
-                correlation += samples[i] * samples[i + period]
-                energy1 += samples[i] * samples[i]
-                energy2 += samples[i + period] * samples[i + period]
-            }
-
-            // Normalized correlation
-            let normFactor = sqrt(energy1 * energy2)
-            if normFactor > 0 {
-                correlation /= normFactor
-            }
-
-            if correlation > bestCorrelation {
-                bestCorrelation = correlation
-                bestPeriod = period
-            }
-        }
-
-        // Require minimum correlation for confidence
-        guard bestCorrelation > 0.8 && bestPeriod > 0 else { return nil }
-
-        // Parabolic interpolation for sub-sample precision
-        let frequency = sampleRate / Double(bestPeriod)
-
-        return (frequency, Double(bestCorrelation))
     }
 
     deinit {
