@@ -6,6 +6,16 @@
 //  Groups estimates by MIDI note and selects the most agreed-upon pitch.
 
 import Foundation
+import os.log
+
+private let pitchLogger = Logger(subsystem: "maistro", category: "PitchDetection")
+
+/// Timing result for a single algorithm execution
+struct AlgorithmTiming {
+    let algorithmName: String
+    let durationMs: Double
+    let detectedPitch: Bool
+}
 
 /// Configuration for aggregate pitch detection
 struct AggregateDetectorConfig {
@@ -18,10 +28,14 @@ struct AggregateDetectorConfig {
     /// Whether to require strict majority (> 50%)
     let requireMajority: Bool
 
-    init(centsTolerance: Double, minimumConsensus: Int, requireMajority: Bool) {
+    /// Whether to log timing information
+    let enableTimingLogs: Bool
+
+    init(centsTolerance: Double, minimumConsensus: Int, requireMajority: Bool, enableTimingLogs: Bool) {
         self.centsTolerance = centsTolerance
         self.minimumConsensus = minimumConsensus
         self.requireMajority = requireMajority
+        self.enableTimingLogs = enableTimingLogs
     }
 }
 
@@ -45,18 +59,20 @@ struct AggregatePitchDetector: PitchDetectionAlgorithm {
         minFrequency: Double,
         maxFrequency: Double
     ) -> PitchEstimate? {
-        // Collect estimates from all algorithms
-        var estimates: [PitchEstimate] = []
+        let totalStart = CFAbsoluteTimeGetCurrent()
 
-        for algorithm in algorithms {
-            if let estimate = algorithm.detectPitch(
-                samples: samples,
-                sampleRate: sampleRate,
-                minFrequency: minFrequency,
-                maxFrequency: maxFrequency
-            ) {
-                estimates.append(estimate)
-            }
+        // Run all algorithms in parallel
+        let (estimates, timings) = runAlgorithmsInParallel(
+            samples: samples,
+            sampleRate: sampleRate,
+            minFrequency: minFrequency,
+            maxFrequency: maxFrequency
+        )
+
+        // Log timing information
+        if config.enableTimingLogs {
+            let totalMs = (CFAbsoluteTimeGetCurrent() - totalStart) * 1000
+            logTimings(timings: timings, totalMs: totalMs)
         }
 
         // Need at least minimum consensus to proceed
@@ -99,6 +115,66 @@ struct AggregatePitchDetector: PitchDetectionAlgorithm {
             confidence: aggregateConfidence,
             algorithm: name
         )
+    }
+
+    /// Run all algorithms in parallel using concurrent dispatch
+    private func runAlgorithmsInParallel(
+        samples: [Float],
+        sampleRate: Double,
+        minFrequency: Double,
+        maxFrequency: Double
+    ) -> (estimates: [PitchEstimate], timings: [AlgorithmTiming]) {
+        let count = algorithms.count
+        var results = [(PitchEstimate?, AlgorithmTiming)?](repeating: nil, count: count)
+        let lock = NSLock()
+
+        DispatchQueue.concurrentPerform(iterations: count) { index in
+            let algorithm = algorithms[index]
+            let start = CFAbsoluteTimeGetCurrent()
+
+            let estimate = algorithm.detectPitch(
+                samples: samples,
+                sampleRate: sampleRate,
+                minFrequency: minFrequency,
+                maxFrequency: maxFrequency
+            )
+
+            let durationMs = (CFAbsoluteTimeGetCurrent() - start) * 1000
+            let timing = AlgorithmTiming(
+                algorithmName: algorithm.name,
+                durationMs: durationMs,
+                detectedPitch: estimate != nil
+            )
+
+            lock.lock()
+            results[index] = (estimate, timing)
+            lock.unlock()
+        }
+
+        var estimates: [PitchEstimate] = []
+        var timings: [AlgorithmTiming] = []
+
+        for result in results {
+            if let (estimate, timing) = result {
+                timings.append(timing)
+                if let est = estimate {
+                    estimates.append(est)
+                }
+            }
+        }
+
+        return (estimates, timings)
+    }
+
+    /// Log timing information for all algorithms
+    private func logTimings(timings: [AlgorithmTiming], totalMs: Double) {
+        var logMessage = String(format: "Pitch detection total: %.2fms | ", totalMs)
+        let details = timings.map { timing -> String in
+            let status = timing.detectedPitch ? "✓" : "✗"
+            return String(format: "%@: %.2fms %@", timing.algorithmName, timing.durationMs, status)
+        }
+        logMessage += details.joined(separator: " | ")
+        pitchLogger.debug("\(logMessage)")
     }
 
     /// Group estimates that are within cents tolerance of each other
@@ -160,17 +236,18 @@ struct AggregatePitchDetector: PitchDetectionAlgorithm {
         minFrequency: Double,
         maxFrequency: Double
     ) -> AggregatePitchEstimate? {
-        var estimates: [PitchEstimate] = []
+        let totalStart = CFAbsoluteTimeGetCurrent()
 
-        for algorithm in algorithms {
-            if let estimate = algorithm.detectPitch(
-                samples: samples,
-                sampleRate: sampleRate,
-                minFrequency: minFrequency,
-                maxFrequency: maxFrequency
-            ) {
-                estimates.append(estimate)
-            }
+        let (estimates, timings) = runAlgorithmsInParallel(
+            samples: samples,
+            sampleRate: sampleRate,
+            minFrequency: minFrequency,
+            maxFrequency: maxFrequency
+        )
+
+        if config.enableTimingLogs {
+            let totalMs = (CFAbsoluteTimeGetCurrent() - totalStart) * 1000
+            logTimings(timings: timings, totalMs: totalMs)
         }
 
         guard !estimates.isEmpty else {
@@ -200,6 +277,29 @@ struct AggregatePitchDetector: PitchDetectionAlgorithm {
     }
 }
 
+/// Available pitch detection algorithm types
+enum PitchAlgorithmType: String, CaseIterable, Identifiable {
+    case aggregate = "Aggregate (Majority Vote)"
+    case autocorrelation = "Autocorrelation"
+    case yin = "YIN"
+    case mcleod = "McLeod (MPM)"
+    case hps = "Harmonic Product Spectrum"
+    case yaapt = "YAAPT"
+
+    var id: String { rawValue }
+
+    var shortName: String {
+        switch self {
+        case .aggregate: return "Aggregate"
+        case .autocorrelation: return "Autocorrelation"
+        case .yin: return "YIN"
+        case .mcleod: return "McLeod"
+        case .hps: return "HPS"
+        case .yaapt: return "YAAPT"
+        }
+    }
+}
+
 /// Factory for creating standard algorithm configurations
 enum PitchDetectorFactory {
     /// Create all available pitch detection algorithms with sensible defaults
@@ -214,11 +314,12 @@ enum PitchDetectorFactory {
     }
 
     /// Create an aggregate detector with all algorithms and default config
-    static func createAggregateDetector() -> AggregatePitchDetector {
+    static func createAggregateDetector(enableTimingLogs: Bool) -> AggregatePitchDetector {
         let config = AggregateDetectorConfig(
             centsTolerance: 50.0,
             minimumConsensus: 2,
-            requireMajority: true
+            requireMajority: true,
+            enableTimingLogs: enableTimingLogs
         )
 
         return AggregatePitchDetector(
@@ -227,7 +328,25 @@ enum PitchDetectorFactory {
         )
     }
 
-    /// Create specific algorithm by name
+    /// Create algorithm by type
+    static func createAlgorithm(type: PitchAlgorithmType, enableTimingLogs: Bool) -> PitchDetectionAlgorithm {
+        switch type {
+        case .aggregate:
+            return createAggregateDetector(enableTimingLogs: enableTimingLogs)
+        case .autocorrelation:
+            return AutocorrelationPitchDetector(correlationThreshold: 0.8)
+        case .yin:
+            return YINPitchDetector(threshold: 0.15)
+        case .mcleod:
+            return McLeodPitchDetector(cutoff: 0.93, smallCutoff: 0.5)
+        case .hps:
+            return HarmonicProductSpectrumDetector(harmonics: 5, peakThreshold: 3.0)
+        case .yaapt:
+            return YAAPTPitchDetector(numHarmonics: 10, voicingThreshold: 0.4, shcThreshold: 0.3)
+        }
+    }
+
+    /// Create specific algorithm by name (legacy)
     static func createAlgorithm(named name: String) -> PitchDetectionAlgorithm? {
         switch name.lowercased() {
         case "autocorrelation":

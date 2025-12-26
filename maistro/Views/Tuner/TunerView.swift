@@ -16,7 +16,7 @@ struct TunerView: View {
             minFrequency: 60.0,
             maxFrequency: 2000.0
         ),
-        algorithm: PitchDetectorFactory.createAggregateDetector()
+        algorithm: PitchDetectorFactory.createAggregateDetector(enableTimingLogs: false)
     )
     @State private var showingThemeSheet = false
 

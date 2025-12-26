@@ -13,6 +13,11 @@ struct SandboxView: View {
     @State private var notation: String = "C4/q, D4/q, E4/q, F4/q"
     @State private var notationInput: String = "C4/q, D4/q, E4/q, F4/q"
 
+    // Tuner state
+    @State private var selectedAlgorithm: PitchAlgorithmType = .aggregate
+    @State private var isTunerActive = false
+    @State private var pitchDetector: PitchDetector?
+
     let exampleNotations = [
         ("C Major Scale", "C4/q, D4/q, E4/q, F4/q, G4/q, A4/q, B4/q, C5/q"),
         ("Simple Melody", "E4/q, E4/q, F4/q, G4/q, G4/q, F4/q, E4/q, D4/q"),
@@ -24,6 +29,17 @@ struct SandboxView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                // Pitch Detection Sandbox
+                SandboxTunerSection(
+                    selectedAlgorithm: $selectedAlgorithm,
+                    isTunerActive: $isTunerActive,
+                    pitchDetector: $pitchDetector
+                )
+                .padding(.horizontal)
+
+                Divider()
+                    .padding(.horizontal)
+
                 // Sheet Music Display
                 VStack(spacing: 8) {
                     Text("Sheet Music Preview")
@@ -138,6 +154,218 @@ struct SandboxView: View {
         )
         .sheet(isPresented: $showingThemeSheet) {
             ThemePickerSheet()
+        }
+        .onDisappear {
+            pitchDetector?.stop()
+        }
+    }
+}
+
+// MARK: - Sandbox Tuner Section
+
+struct SandboxTunerSection: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    @Binding var selectedAlgorithm: PitchAlgorithmType
+    @Binding var isTunerActive: Bool
+    @Binding var pitchDetector: PitchDetector?
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Pitch Detection")
+                .font(.headline)
+                .foregroundColor(themeManager.colors.textNeutral)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Algorithm selector
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Algorithm")
+                    .font(.caption)
+                    .foregroundColor(themeManager.colors.textSecondary)
+
+                Picker("Algorithm", selection: $selectedAlgorithm) {
+                    ForEach(PitchAlgorithmType.allCases) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
+                .pickerStyle(.menu)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(themeManager.colors.neutralAccent.opacity(0.3))
+                .cornerRadius(8)
+                .onChange(of: selectedAlgorithm) { _, _ in
+                    if isTunerActive {
+                        restartTuner()
+                    }
+                }
+            }
+
+            // Start/Stop button
+            ThemedButton(
+                isTunerActive ? "Stop Listening" : "Start Listening",
+                type: isTunerActive ? .secondary : .primary,
+                size: .medium
+            ) {
+                if isTunerActive {
+                    stopTuner()
+                } else {
+                    startTuner()
+                }
+            }
+
+            // Pitch display
+            if let detector = pitchDetector, isTunerActive {
+                VStack(spacing: 12) {
+                    // Algorithm name
+                    Text("Using: \(detector.algorithmName)")
+                        .font(.caption)
+                        .foregroundColor(themeManager.colors.textSecondary)
+
+                    // Note display
+                    Text(detector.currentPitch?.noteName ?? "--")
+                        .font(.system(size: 64, weight: .bold, design: .rounded))
+                        .foregroundColor(themeManager.colors.textNeutral)
+
+                    // Frequency and cents
+                    HStack(spacing: 24) {
+                        VStack(spacing: 2) {
+                            Text("Frequency")
+                                .font(.caption2)
+                                .foregroundColor(themeManager.colors.textSecondary)
+                            Text(detector.currentPitch != nil
+                                 ? String(format: "%.1f Hz", detector.currentPitch!.frequency)
+                                 : "-- Hz")
+                                .font(.callout.monospacedDigit())
+                                .foregroundColor(themeManager.colors.textNeutral)
+                        }
+
+                        VStack(spacing: 2) {
+                            Text("Cents")
+                                .font(.caption2)
+                                .foregroundColor(themeManager.colors.textSecondary)
+                            Text(detector.currentPitch != nil
+                                 ? String(format: "%+.0f¢", detector.currentPitch!.centsDeviation)
+                                 : "--")
+                                .font(.callout.monospacedDigit())
+                                .foregroundColor(centsColor(detector.currentPitch?.centsDeviation))
+                        }
+
+                        VStack(spacing: 2) {
+                            Text("Confidence")
+                                .font(.caption2)
+                                .foregroundColor(themeManager.colors.textSecondary)
+                            Text(detector.currentPitch != nil
+                                 ? String(format: "%.0f%%", detector.currentPitch!.confidence * 100)
+                                 : "--%")
+                                .font(.callout.monospacedDigit())
+                                .foregroundColor(themeManager.colors.textNeutral)
+                        }
+                    }
+
+                    // Tuning indicator bar
+                    if let cents = detector.currentPitch?.centsDeviation {
+                        TuningIndicatorBar(centsDeviation: cents)
+                    }
+                }
+                .padding()
+                .background(themeManager.colors.neutralAccent.opacity(0.2))
+                .cornerRadius(12)
+            } else if !isTunerActive {
+                Text("Tap 'Start Listening' to test pitch detection algorithms")
+                    .font(.caption)
+                    .foregroundColor(themeManager.colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(themeManager.colors.neutralAccent.opacity(0.1))
+                    .cornerRadius(12)
+            }
+        }
+    }
+
+    private func centsColor(_ cents: Double?) -> Color {
+        guard let cents = cents else { return themeManager.colors.textNeutral }
+        let absCents = abs(cents)
+        if absCents < 5 {
+            return .green
+        } else if absCents < 15 {
+            return .yellow
+        } else {
+            return .red
+        }
+    }
+
+    private func startTuner() {
+        let algorithm = PitchDetectorFactory.createAlgorithm(
+            type: selectedAlgorithm,
+            enableTimingLogs: true
+        )
+        let config = PitchDetectorConfig(
+            sampleRate: 44100.0,
+            bufferSize: 4096,
+            minFrequency: 60.0,
+            maxFrequency: 2000.0
+        )
+        pitchDetector = PitchDetector(config: config, algorithm: algorithm)
+        isTunerActive = true
+
+        Task {
+            await pitchDetector?.start()
+        }
+    }
+
+    private func stopTuner() {
+        pitchDetector?.stop()
+        isTunerActive = false
+    }
+
+    private func restartTuner() {
+        stopTuner()
+        startTuner()
+    }
+}
+
+// MARK: - Tuning Indicator Bar
+
+struct TuningIndicatorBar: View {
+    @EnvironmentObject var themeManager: ThemeManager
+    let centsDeviation: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let center = width / 2
+            let maxOffset = width / 2 - 4
+            let offset = min(max(centsDeviation / 50.0, -1), 1) * maxOffset
+
+            ZStack {
+                // Background track
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(themeManager.colors.neutralAccent.opacity(0.3))
+
+                // Center marker
+                Rectangle()
+                    .fill(Color.green.opacity(0.5))
+                    .frame(width: 2)
+                    .position(x: center, y: geometry.size.height / 2)
+
+                // Indicator
+                Circle()
+                    .fill(indicatorColor)
+                    .frame(width: 12, height: 12)
+                    .position(x: center + offset, y: geometry.size.height / 2)
+            }
+        }
+        .frame(height: 20)
+    }
+
+    private var indicatorColor: Color {
+        let absCents = abs(centsDeviation)
+        if absCents < 5 {
+            return .green
+        } else if absCents < 15 {
+            return .yellow
+        } else {
+            return .red
         }
     }
 }
